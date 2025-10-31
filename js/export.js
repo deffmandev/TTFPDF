@@ -22,6 +22,11 @@ require('fpdf/fpdf.php');
     // Vérifier si on a besoin des méthodes Circle/Ellipse
     const needsCircle = editor.elements.some(el => el.type === 'circle');
 
+    // Vérifier si on a besoin de RoundedRect
+    const needsRoundedRect = editor.elements.some(el => 
+        el.type === 'rect' && el.rounded && el.radius > 0
+    );
+
     if (needsAlpha) {
         phpCode += `
 // Classe pour gérer la transparence (opacité)
@@ -104,7 +109,11 @@ class PDF extends ${needsAlpha ? 'AlphaPDF' : 'FPDF'} {
     function Footer() {
         // Pas de pied de page
     }
-    
+    `;
+
+    // Ajouter RoundedRect seulement si nécessaire
+    if (needsRoundedRect) {
+        phpCode += `
     // ✅ Fonction RoundedRect ajoutée
     function RoundedRect($x, $y, $w, $h, $r, $style = '') {
         $k = $this->k;
@@ -142,6 +151,7 @@ class PDF extends ${needsAlpha ? 'AlphaPDF' : 'FPDF'} {
             $x2*$this->k, ($h-$y2)*$this->k, $x3*$this->k, ($h-$y3)*$this->k));
     }
 `;
+    }
 
     // Ajouter les méthodes Circle et Ellipse si nécessaire
     if (needsCircle) {
@@ -215,11 +225,15 @@ $pdf->Output('I', 'document.pdf');
     return phpCode;
 }
 
-// Fonction pour échapper les caractères spéciaux
+// Fonction pour échapper les caractères spéciaux dans les chaînes PHP
 function escapeString(str) {
     if (!str) return '';
-    // Préserver les sauts de ligne pour les textes multilignes
-    return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '');
+    // Échapper les caractères qui peuvent casser le code PHP
+    return str.replace(/\\/g, '\\\\')  // Backslash
+              .replace(/\$/g, '\\$')    // Dollar (pour éviter l'interpolation de variables)
+              .replace(/"/g, '\\"')     // Guillemet double (si on utilise des guillemets doubles)
+              .replace(/\n/g, '\\n')    // Saut de ligne
+              .replace(/\r/g, '');      // Retour chariot
 }
 
 // Fonction pour convertir HEX en RGB (format chaîne pour PHP)
@@ -290,7 +304,7 @@ function generateElementPHP(el) {
             // Ajuster la position Y pour un meilleur alignement du texte
             const adjustedY = el.y + (el.fontSize / 4);
             code += `$pdf->SetXY(${el.x}, ${adjustedY});\n`;
-            code += `$pdf->Write(0, utf8_to_iso8859_1('${escapeString(el.content)}'));\n`;
+            code += `$pdf->Write(0, utf8_to_iso8859_1("${escapeString(el.content)}"));\n`;
             break;
 
         case 'textcell':
@@ -308,7 +322,7 @@ function generateElementPHP(el) {
             code += `$pdf->SetLineWidth(${el.borderWidth});\n`;
             code += `$pdf->SetXY(${el.x}, ${el.y});\n`;
             // Pour les cellules de texte : utiliser Cell() (une seule ligne)
-            code += `$pdf->Cell(${el.width}, ${el.height}, utf8_to_iso8859_1('${escapeString(el.content)}'), ${el.border}, 0, '${el.align}', ${el.fillColor !== 'transparent' ? 'true' : 'false'});\n`;
+            code += `$pdf->Cell(${el.width}, ${el.height}, utf8_to_iso8859_1("${escapeString(el.content)}"), ${el.border}, 0, '${el.align}', ${el.fillColor !== 'transparent' ? 'true' : 'false'});\n`;
             break;
 
         case 'multicell':
@@ -327,9 +341,11 @@ function generateElementPHP(el) {
             code += `$pdf->SetXY(${el.x}, ${el.y});\n`;
             // Utiliser la hauteur de ligne appropriée pour correspondre à l'éditeur
             const lineHeight = el.lineHeight || (el.fontSize * 1.2);
-            // Préserver les sauts de ligne du textarea
-            const contentWithLineBreaks = el.content.replace(/\n/g, '\\n').replace(/\r/g, '');
-            code += `$pdf->MultiCell(${el.width}, ${lineHeight}, utf8_to_iso8859_1("${contentWithLineBreaks}"), ${el.border}, '${el.align}', ${el.fillColor !== 'transparent' ? 'true' : 'false'});\n`;
+            // Préserver les sauts de ligne du textarea - utiliser des sauts de ligne réels dans le code PHP
+            const contentWithLineBreaks = el.content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            // Pour MultiCell, utiliser des sauts de ligne réels dans le code PHP au lieu de \n
+            const escapedContent = escapeString(contentWithLineBreaks);
+            code += `$pdf->MultiCell(${el.width}, ${lineHeight}, utf8_to_iso8859_1("${escapedContent.replace(/\\n/g, '\n')}"), ${el.border}, '${el.align}', ${el.fillColor !== 'transparent' ? 'true' : 'false'});\n`;
             break;
 
         case 'rect':
@@ -408,7 +424,7 @@ function generateElementPHP(el) {
                 code += `    $pdf->Image($imagePath, ${el.x}, ${el.y}, ${el.width}, ${el.height});\n`;
                 
                 if (el.link && el.link.trim() !== '') {
-                    code += `    $pdf->Link(${el.x}, ${el.y}, ${el.width}, ${el.height}, '${escapeString(el.link)}');\n`;
+                    code += `    $pdf->Link(${el.x}, ${el.y}, ${el.width}, ${el.height}, "${escapeString(el.link)}");\n`;
                 }
                 
                 if (el.border === 1) {
@@ -442,7 +458,7 @@ function generateElementPHP(el) {
         case 'barcode':
             code += `$pdf->SetFont('Arial', '', 8);\n`;
             code += `$pdf->SetXY(${el.x}, ${el.y});\n`;
-            code += `$pdf->Cell(${el.width}, ${el.height}, utf8_to_iso8859_1('${escapeString(el.barcodeType || 'C128')}: ${escapeString(el.code || '123456789')}'), 1, 0, 'C');\n`;
+            code += `$pdf->Cell(${el.width}, ${el.height}, utf8_to_iso8859_1("${escapeString(el.barcodeType || 'C128')}: ${escapeString(el.code || '123456789')}"), 1, 0, 'C');\n`;
             break;
     }
 
