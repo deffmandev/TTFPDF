@@ -130,6 +130,11 @@ const FormBuilder = {
                 <label>Couleur</label>
                 <input type="color" id="editColor" value="${el.color || '#000000'}">
             </div>
+            <div class="form-group">
+                <label>Rotation (degrés)</label>
+                <input type="number" id="editRotation" value="${el.rotation || 0}" min="-360" max="360" step="15">
+                <small style="display: block; margin-top: 5px; color: #666;">Rotation dans le sens horaire</small>
+            </div>
         `;
     },
 
@@ -237,6 +242,11 @@ const FormBuilder = {
                 <label>Rayon (mm)</label>
                 <input type="number" id="editRadius" value="${el.radius || 5}" step="0.1" min="0" max="50">
             </div>
+            <div class="form-group">
+                <label>Rotation (degrés)</label>
+                <input type="number" id="editRotation" value="${el.rotation || 0}" min="-360" max="360" step="15">
+                <small style="display: block; margin-top: 5px; color: #666;">Rotation dans le sens horaire</small>
+            </div>
             <script>
                 document.getElementById('editRounded').addEventListener('change', (e) => {
                     document.getElementById('radiusGroup').style.display = e.target.checked ? 'block' : 'none';
@@ -329,6 +339,10 @@ const FormBuilder = {
                     <input type="checkbox" id="editTransparent" ${el.fillColor === 'transparent' ? 'checked' : ''}>
                     Transparent
                 </label>
+            </div>
+            <div class="form-group">
+                <label>Rotation (degrés - sens horaire ⟳)</label>
+                <input type="number" id="editRotation" value="${el.rotation || 0}" min="0" max="360" step="15">
             </div>
             <script>
                 document.getElementById('editTransparent').addEventListener('change', (e) => {

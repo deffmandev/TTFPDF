@@ -285,6 +285,10 @@ class PDFEditor {
                         <label>Couleur</label>
                         <input type="color" id="rtColor" value="${element.color || '#000000'}" onchange="editor.updateElementProperty('${element.id}', 'color', this.value)">
                     </div>
+                    <div class="form-group">
+                        <label>Rotation (°)</label>
+                        <input type="number" id="rtRotation" value="${element.rotation || 0}" min="0" max="360" step="15" oninput="editor.updateElementProperty('${element.id}', 'rotation', this.value)">
+                    </div>
                 `;
                 break;
 
@@ -855,6 +859,7 @@ class PDFEditor {
                 // Pour les éléments de texte simple
                 if (element.type === 'text') {
                     div.style.fontSize = value + 'pt';
+                    div.style.margin = -(value / 4) + 'px 0px 0px 4px'; // Margin négatif = taille de police / 4
                     console.log('✅ fontSize appliqué directement sur div');
                 } else {
                     // Pour les cellules de texte, multicell, header, footer
@@ -934,7 +939,14 @@ class PDFEditor {
                 break;
                 
             case 'rotation':
-                if (element.type === 'image') {
+                if (element.type === 'text') {
+                    if (value && value !== 0) {
+                        div.style.transform = `rotate(${-value}deg)`;
+                        div.style.transformOrigin = 'center center';
+                    } else {
+                        div.style.transform = 'none';
+                    }
+                } else if (element.type === 'image') {
                     const img = div.querySelector('img');
                     if (img) {
                         img.style.transform = `rotate(${-value}deg)`;
@@ -1173,6 +1185,7 @@ class PDFEditor {
                 if (document.getElementById('editFontStyle')) el.fontStyle = document.getElementById('editFontStyle').value;
                 if (document.getElementById('editColor')) el.color = document.getElementById('editColor').value;
                 if (document.getElementById('editAlign')) el.align = document.getElementById('editAlign').value;
+                if (document.getElementById('editRotation')) el.rotation = parseInt(document.getElementById('editRotation').value);
                 break;
             case 'textcell':
                 if (document.getElementById('editContent')) el.content = document.getElementById('editContent').value;
@@ -1261,6 +1274,7 @@ class PDFEditor {
                         el.fillColor = document.getElementById('editFillColor').value;
                     }
                 }
+                if (document.getElementById('editRotation')) el.rotation = parseInt(document.getElementById('editRotation').value);
                 break;
             case 'line':
                 if (document.getElementById('editX1')) el.x1 = parseFloat(document.getElementById('editX1').value);
@@ -1294,6 +1308,7 @@ class PDFEditor {
                         el.fillColor = document.getElementById('editFillColor').value;
                     }
                 }
+                if (document.getElementById('editRotation')) el.rotation = parseInt(document.getElementById('editRotation').value);
                 break;
             case 'image':
                 if (document.getElementById('editWidth')) el.width = parseFloat(document.getElementById('editWidth').value);

@@ -7,10 +7,15 @@ header('Content-Type: text/html; charset=utf-8');
 
 // Fonction pour convertir UTF-8 en ISO-8859-1
 function utf8_to_iso8859_1($string) {
-    return mb_convert_encoding($string, 'ISO-8859-1', 'UTF-8');
+    if (function_exists('mb_convert_encoding')) {
+        return mb_convert_encoding($string, 'ISO-8859-1', 'UTF-8');
+    } else {
+        // Fallback si mbstring n'est pas disponible
+        return utf8_decode($string);
+    }
 }
 
-require('fpdf/fpdf.php');
+require(__DIR__ . '/../fpdf/fpdf.php');
 
 `;
 
@@ -25,6 +30,16 @@ require('fpdf/fpdf.php');
     // Vérifier si on a besoin de RoundedRect
     const needsRoundedRect = editor.elements.some(el => 
         el.type === 'rect' && el.rounded && el.radius > 0
+    );
+
+    // Vérifier si on a besoin de la méthode Rotate
+    const needsRotate = editor.elements.some(el => 
+        (el.type === 'image' && el.rotation !== undefined && el.rotation !== 0) ||
+        (el.type === 'text' && el.rotation !== undefined && el.rotation !== 0) ||
+        (el.type === 'textcell' && el.rotation !== undefined && el.rotation !== 0) ||
+        (el.type === 'multicell' && el.rotation !== undefined && el.rotation !== 0) ||
+        (el.type === 'rect' && el.rotation !== undefined && el.rotation !== 0) ||
+        (el.type === 'circle' && el.rotation !== undefined && el.rotation !== 0)
     );
 
     if (needsAlpha) {
@@ -197,6 +212,44 @@ class PDF extends ${needsAlpha ? 'AlphaPDF' : 'FPDF'} {
 `;
     }
 
+    // Ajouter la méthode Rotate si nécessaire
+    if (needsRotate) {
+        phpCode += `
+    // Méthode pour faire pivoter le système de coordonnées
+    var $angle=0;
+
+    function Rotate($angle,$x=-1,$y=-1)
+    {
+        if($x==-1)
+            $x=$this->x;
+        if($y==-1)
+            $y=$this->y;
+        if($this->angle!=0)
+            $this->_out('Q');
+        $this->angle=$angle;
+        if($angle!=0)
+        {
+            $angle*=M_PI/180;
+            $c=cos($angle);
+            $s=sin($angle);
+            $cx=$x*$this->k;
+            $cy=($this->h-$y)*$this->k;
+            $this->_out(sprintf('q %.5F %.5F %.5F %.5F %.2F %.2F cm 1 0 0 1 %.2F %.2F cm',$c,$s,-$s,$c,$cx,$cy,-$cx,-$cy));
+        }
+    }
+
+    function _endpage()
+    {
+        if($this->angle!=0)
+        {
+            $this->angle=0;
+            $this->_out('Q');
+        }
+        parent::_endpage();
+    }
+`;
+    }
+
     phpCode += `}
 
 $pdf = new PDF('${editor.pageSettings.orientation}', '${editor.pageSettings.unit}', '${editor.pageSettings.format}');
@@ -301,10 +354,33 @@ function generateElementPHP(el) {
             
             code += `$pdf->SetFont('${fontFamily}', '${el.fontStyle}', ${el.fontSize});\n`;
             code += `$pdf->SetTextColor(${hexToRGB(el.color)});\n`;
+            
             // Ajuster la position Y pour un meilleur alignement du texte
-            const adjustedY = el.y + (el.fontSize / 4);
-            code += `$pdf->SetXY(${el.x}, ${adjustedY});\n`;
+            const adjustedY = el.y + (el.fontSize / 8);
+            
+            if (el.rotation && el.rotation !== 0) {
+                // Calculer la largeur exacte du texte avec FPDF
+                code += `// Calculer la largeur exacte du texte pour la rotation\n`;
+                code += `$textWidth = $pdf->GetStringWidth(utf8_to_iso8859_1("${escapeString(el.content)}"));\n`;
+                code += `$textHeight = ${el.fontSize} * 0.25; // Hauteur approximative basée sur la taille de police\n`;
+                
+                // Centre du texte non-rotaté
+                code += `$centerX = ${el.x} + ($textWidth / 2);\n`;
+                code += `$centerY = ${el.y} + (${el.fontSize} / 8);\n`; // Centre plus haut
+                
+                code += `// Positionner le texte à sa position normale\n`;
+                code += `$pdf->SetXY(${el.x}, ${adjustedY});\n`;
+                code += `// Rotation autour du centre du texte\n`;
+                code += `$pdf->Rotate(${el.rotation}, $centerX, $centerY);\n`;
+            } else {
+                code += `$pdf->SetXY(${el.x}, ${adjustedY});\n`;
+            }
+            
             code += `$pdf->Write(0, utf8_to_iso8859_1("${escapeString(el.content)}"));\n`;
+            
+            if (el.rotation && el.rotation !== 0) {
+                code += `$pdf->Rotate(0);\n`;
+            }
             break;
 
         case 'textcell':
@@ -320,9 +396,20 @@ function generateElementPHP(el) {
             }
             code += `$pdf->SetDrawColor(${hexToRGB(el.borderColor)});\n`;
             code += `$pdf->SetLineWidth(${el.borderWidth});\n`;
+            
+            if (el.rotation && el.rotation !== 0) {
+                const centerX = el.x + (el.width / 2);
+                const centerY = el.y + (el.height / 2);
+                code += `$pdf->Rotate(${el.rotation}, ${centerX}, ${centerY});\n`;
+            }
+            
             code += `$pdf->SetXY(${el.x}, ${el.y});\n`;
             // Pour les cellules de texte : utiliser Cell() (une seule ligne)
             code += `$pdf->Cell(${el.width}, ${el.height}, utf8_to_iso8859_1("${escapeString(el.content)}"), ${el.border}, 0, '${el.align}', ${el.fillColor !== 'transparent' ? 'true' : 'false'});\n`;
+            
+            if (el.rotation && el.rotation !== 0) {
+                code += `$pdf->Rotate(0);\n`;
+            }
             break;
 
         case 'multicell':
@@ -338,6 +425,13 @@ function generateElementPHP(el) {
             }
             code += `$pdf->SetDrawColor(${hexToRGB(el.borderColor)});\n`;
             code += `$pdf->SetLineWidth(${el.borderWidth});\n`;
+            
+            if (el.rotation && el.rotation !== 0) {
+                const centerX = el.x + (el.width / 2);
+                const centerY = el.y + ((el.minHeight || el.height || 20) / 2);
+                code += `$pdf->Rotate(${el.rotation}, ${centerX}, ${centerY});\n`;
+            }
+            
             code += `$pdf->SetXY(${el.x}, ${el.y});\n`;
             // Utiliser la hauteur de ligne appropriée pour correspondre à l'éditeur
             const lineHeight = el.lineHeight || (el.fontSize * 1.2);
@@ -346,6 +440,10 @@ function generateElementPHP(el) {
             // Pour MultiCell, utiliser des sauts de ligne réels dans le code PHP au lieu de \n
             const escapedContent = escapeString(contentWithLineBreaks);
             code += `$pdf->MultiCell(${el.width}, ${lineHeight}, utf8_to_iso8859_1("${escapedContent.replace(/\\n/g, '\n')}"), ${el.border}, '${el.align}', ${el.fillColor !== 'transparent' ? 'true' : 'false'});\n`;
+            
+            if (el.rotation && el.rotation !== 0) {
+                code += `$pdf->Rotate(0);\n`;
+            }
             break;
 
         case 'rect':
@@ -358,9 +456,25 @@ function generateElementPHP(el) {
             if (el.rounded && el.radius > 0) {
                 // Rectangle arrondi - nécessite PDF_Extended
                 code += `// Rectangle avec coins arrondis\n`;
+                if (el.rotation && el.rotation !== 0) {
+                    const centerX = el.x + (el.width / 2);
+                    const centerY = el.y + (el.height / 2);
+                    code += `$pdf->Rotate(${el.rotation}, ${centerX}, ${centerY});\n`;
+                }
                 code += `$pdf->RoundedRect(${el.x}, ${el.y}, ${el.width}, ${el.height}, ${el.radius}, '${el.fillColor !== 'transparent' ? 'DF' : 'D'}');\n`;
+                if (el.rotation && el.rotation !== 0) {
+                    code += `$pdf->Rotate(0);\n`;
+                }
             } else {
+                if (el.rotation && el.rotation !== 0) {
+                    const centerX = el.x + (el.width / 2);
+                    const centerY = el.y + (el.height / 2);
+                    code += `$pdf->Rotate(${el.rotation}, ${centerX}, ${centerY});\n`;
+                }
                 code += `$pdf->Rect(${el.x}, ${el.y}, ${el.width}, ${el.height}, '${el.fillColor !== 'transparent' ? 'DF' : 'D'}');\n`;
+                if (el.rotation && el.rotation !== 0) {
+                    code += `$pdf->Rotate(0);\n`;
+                }
             }
             break;
 
@@ -388,6 +502,11 @@ function generateElementPHP(el) {
             const radiusX = parseFloat(el.radiusX || el.radius || 15);
             const radiusY = parseFloat(el.radiusY || el.radius || 15);
             
+            // Appliquer la rotation si nécessaire
+            if (el.rotation && el.rotation !== 0) {
+                code += `$pdf->Rotate(${el.rotation}, ${centerX}, ${centerY});\n`;
+            }
+            
             // Déterminer le style
             const circleHasFill = el.fillColor && el.fillColor !== 'transparent';
             const circleStyle = circleHasFill ? 'FD' : 'D';
@@ -397,6 +516,11 @@ function generateElementPHP(el) {
                 code += `$pdf->Circle(${centerX}, ${centerY}, ${radiusX}, '${circleStyle}');\n`;
             } else {
                 code += `$pdf->Ellipse(${centerX}, ${centerY}, ${radiusX}, ${radiusY}, '${circleStyle}');\n`;
+            }
+            
+            // Restaurer la rotation
+            if (el.rotation && el.rotation !== 0) {
+                code += `$pdf->Rotate(0);\n`;
             }
             break;
 

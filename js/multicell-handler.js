@@ -23,6 +23,12 @@ function renderMultiCellElement(div, element, zControls, editor) {
     div.style.borderStyle = 'solid';
     div.style.backgroundColor = element.fillColor;
     
+    // Appliquer la rotation si nécessaire
+    if (element.rotation && element.rotation !== 0) {
+        div.style.transform = `rotate(${-element.rotation}deg)`;
+        div.style.transformOrigin = 'center center';
+    }
+    
     // Contenu du multicell
     const multiContent = document.createElement('div');
     multiContent.className = 'multicell-content';

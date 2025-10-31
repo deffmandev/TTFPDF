@@ -12,7 +12,8 @@ class ElementFactory {
             fontFamily: 'Arial',
             color: '#000000',
             fontStyle: '',
-            align: 'left'
+            align: 'left',
+            rotation: 0
         };
     }
 

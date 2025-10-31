@@ -313,9 +313,9 @@ function moveElementDown(element, editor) {
 }
 
 function renderElementContent(div, element, zControls, editor) {
-    const mmToPx = 3.7795275591;
     
     switch(element.type) {
+        case 'text':
         case 'text':
             div.textContent = element.content;
             div.style.fontSize = element.fontSize + 'pt';
@@ -324,6 +324,11 @@ function renderElementContent(div, element, zControls, editor) {
             div.style.lineHeight = '1'; // Correspondre à FPDF
             div.style.margin = '0';
             div.style.padding = '0';
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                div.style.transform = `rotate(${-element.rotation}deg)`;
+                div.style.transformOrigin = 'center center';
+            }
             applyFontStyle(div, element.fontStyle);
             div.appendChild(zControls);
             break;
@@ -354,6 +359,13 @@ function renderElementContent(div, element, zControls, editor) {
             div.style.boxSizing = 'border-box';
             div.style.overflow = 'visible'; // Permettre au texte de déborder du cadre
             applyFontStyle(cellContent, element.fontStyle);
+            
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                div.style.transform = `rotate(${-element.rotation}deg)`;
+                div.style.transformOrigin = 'center center';
+            }
+            
             div.appendChild(cellContent);
             div.appendChild(zControls);
             break;
@@ -374,6 +386,13 @@ function renderElementContent(div, element, zControls, editor) {
             if (element.rounded && element.radius) {
                 div.style.borderRadius = element.radius + 'mm';
             }
+            
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                div.style.transform = `rotate(${-element.rotation}deg)`;
+                div.style.transformOrigin = 'center center';
+            }
+            
             break;
 
         case 'line':
@@ -402,6 +421,12 @@ function renderElementContent(div, element, zControls, editor) {
             div.style.borderStyle = 'solid';
             div.style.backgroundColor = element.fillColor;
             div.style.boxSizing = 'border-box';
+            
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                div.style.transform = `rotate(${-element.rotation}deg)`;
+                div.style.transformOrigin = 'center center';
+            }
             
             // Mettre à jour width et height pour la logique de redimensionnement
             element.width = sizeX;
@@ -474,6 +499,384 @@ function renderElementContent(div, element, zControls, editor) {
             if (element.borderWidth) {
                 div.style.border = (element.borderWidth * mmToPx) + 'px solid ' + (element.borderColor || '#000000');
             }
+            
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                div.style.transform = `rotate(${-element.rotation}deg)`;
+                div.style.transformOrigin = 'center center';
+            }
+            
+            applyFontStyle(headerFooterContent, element.fontStyle);
+            div.appendChild(headerFooterContent);
+            div.appendChild(zControls);
+            break;
+    }
+}
+
+function startDrag(e, element, editor) {
+    if (e.target.classList.contains('z-btn') || 
+        e.target.closest('.z-controls') ||
+        e.target.classList.contains('resize-handle') ||
+        e.target.classList.contains('line-handle')) {
+        return;
+    }
+
+    // ✅ Empêcher le drag avec le bouton droit - réservé au déplacement de la feuille
+    if (e.button !== 0) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    
+    editor.selectElement(element);
+    editor.isDragging = true;
+    editor.draggedElement = element;
+    
+    const page = document.getElementById('a4Page');
+    const pageRect = page.getBoundingClientRect();
+    const mmToPx = 3.7795275591;
+    
+    let currentX, currentY;
+    
+    if (element.type === 'line') {
+        // Pour les lignes, utiliser le centre comme point de référence
+        currentX = (element.x1 + element.x2) / 2;
+        currentY = (element.y1 + element.y2) / 2;
+    } else {
+        currentX = element.x;
+        currentY = element.y;
+    }
+    
+    // ✅ Compensation du zoom pour l'offset initial
+    const zoomFactor = editor.zoom || 1;
+    const adjustedClientX = e.clientX / zoomFactor;
+    const adjustedClientY = e.clientY / zoomFactor;
+    
+    editor.offset.x = adjustedClientX - pageRect.left - (currentX * mmToPx);
+    editor.offset.y = adjustedClientY - pageRect.top - (currentY * mmToPx);
+
+    const onMouseMove = (e) => {
+        if (!editor.isDragging) return;
+        
+        const pxToMm = 1 / mmToPx;
+        // ✅ Compensation du zoom pour les coordonnées de souris
+        const zoomFactor = editor.zoom || 1;
+        const adjustedClientX = e.clientX / zoomFactor;
+        const adjustedClientY = e.clientY / zoomFactor;
+        
+        const x = (adjustedClientX - pageRect.left - editor.offset.x) * pxToMm;
+        const y = (adjustedClientY - pageRect.top - editor.offset.y) * pxToMm;
+        
+        if (element.type === 'line') {
+            // Déplacer la ligne en gardant ses dimensions
+            const dx = element.x2 - element.x1;
+            const dy = element.y2 - element.y1;
+            
+            // Bloquer le déplacement si dx ou dy est nul (ligne dégénérée)
+            if (dx === 0 || dy === 0) {
+                return; // Ne pas déplacer si la ligne est dégénérée
+            }
+            
+            // Calculer le nouveau centre
+            const centerX = x;
+            const centerY = y;
+            
+            // Recalculer x1,y1 et x2,y2
+            element.x1 = centerX - dx / 2;
+            element.y1 = centerY - dy / 2;
+            element.x2 = centerX + dx / 2;
+            element.y2 = centerY + dy / 2;
+            
+            // S'assurer que x1 <= x2 et y1 <= y2 pendant le déplacement
+            if (element.x1 > element.x2) {
+                [element.x1, element.x2] = [element.x2, element.x1];
+            }
+            if (element.y1 > element.y2) {
+                [element.y1, element.y2] = [element.y2, element.y1];
+            }
+            
+            // Contraindre dans la page
+            const minX = Math.min(element.x1, element.x2);
+            const maxX = Math.max(element.x1, element.x2);
+            const minY = Math.min(element.y1, element.y2);
+            const maxY = Math.max(element.y1, element.y2);
+            
+            if (minX < 0) {
+                const offset = -minX;
+                element.x1 += offset;
+                element.x2 += offset;
+            }
+            if (maxX > 210) {
+                const offset = maxX - 210;
+                element.x1 -= offset;
+                element.x2 -= offset;
+            }
+            if (minY < 0) {
+                const offset = -minY;
+                element.y1 += offset;
+                element.y2 += offset;
+            }
+            if (maxY > 297) {
+                const offset = maxY - 297;
+                element.y1 -= offset;
+                element.y2 -= offset;
+            }
+        } else {
+            // Contraintes normales pour les autres éléments
+            const maxX = 210 - (element.width || 0);
+            const maxY = 297 - (element.minHeight || element.height || 0);
+            
+            element.x = Math.max(0, Math.min(x, maxX));
+            element.y = Math.max(0, Math.min(y, maxY));
+        }
+        
+        const div = document.querySelector(`[data-id="${element.id}"]`);
+        if (element.type === 'line') {
+            div.style.left = Math.min(element.x1, element.x2) + 'mm';
+            div.style.top = Math.min(element.y1, element.y2) + 'mm';
+        } else {
+            div.style.left = element.x + 'mm';
+            div.style.top = element.y + 'mm';
+        }
+        
+        if (element.type === 'line') {
+            const dx = element.x2 - element.x1;
+            const dy = element.y2 - element.y1;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            div.style.width = length + 'mm';
+            div.style.transform = `rotate(${angle}deg)`;
+            updateLineHandles(div, element);
+        }
+    };
+
+    const onMouseUp = () => {
+        editor.isDragging = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        editor.draggedElement = null;
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+}
+
+function renderElementContent(div, element, zControls, editor) {
+    const mmToPx = 3.7795275591;
+    
+    switch(element.type) {
+        case 'text':
+        case 'text':
+            div.textContent = element.content;
+            div.style.fontSize = element.fontSize + 'pt';
+            div.style.fontFamily = element.fontFamily;
+            div.style.color = element.color;
+            //div.style.lineHeight = '-1px'; // Correspondre à FPDF - pas de line-height supplémentaire
+            div.style.margin = -(element.fontSize/4) + 'px 0 0 4px'; // Ajuster la marge supérieure pour centrer verticalement
+            div.style.padding = '0'; // Supprimer tout padding
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.flexWrap = 'wrap';
+            div.style.alignContent = 'flex-start';
+            div.style.justifyContent = 'flex-start';
+            //div.style.whiteSpace = 'nowrap';
+            div.style.border = 'none';
+            // Créer un cadre rouge exactement de la taille de la police
+            //div.style.boxShadow = `0 0 0 0.1mm red`;
+            div.style.background = 'transparent';
+            //div.style.boxSizing = 'border-box';
+            div.style.position = 'absolute';
+            // Hauteur proportionnelle à la police pour un meilleur rendu visuel
+            //div.style.height = element.fontSize/4;
+            div.style.overflow = 'none';
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                div.style.transform = `rotate(${-element.rotation}deg)`;
+                div.style.transformOrigin = 'center center';
+            }
+            applyFontStyle(div, element.fontStyle);
+            // Pour les éléments texte, positionner les contrôles différemment
+            zControls.style.position = 'absolute';
+            zControls.style.top = '-35px';
+            zControls.style.left = '50%';
+            zControls.style.right = 'auto';
+            zControls.style.transform = 'translateX(-50%)';
+            zControls.style.pointerEvents = 'auto';
+            div.appendChild(zControls);
+            break;
+
+        case 'textcell':
+            div.style.width = element.width + 'mm';
+            div.style.height = element.height + 'mm';
+            
+            const cellContent = document.createElement('div');
+            cellContent.textContent = element.content;
+            cellContent.style.fontSize = element.fontSize + 'pt';
+            cellContent.style.fontFamily = element.fontFamily;
+            cellContent.style.color = element.color;
+            cellContent.style.width = '100%';
+            cellContent.style.height = '100%';
+            cellContent.style.display = 'flex';
+            cellContent.style.alignItems = 'center';
+            cellContent.style.justifyContent = convertAlign(element.align);
+            cellContent.style.pointerEvents = 'none';
+            // Pour les cellules de texte : permettre au texte de déborder (comme FPDF Cell)
+            cellContent.style.whiteSpace = 'nowrap';
+            cellContent.style.overflow = 'visible';
+            
+            div.style.borderColor = element.borderColor;
+            div.style.borderWidth = (element.borderWidth * mmToPx) + 'px';
+            div.style.borderStyle = 'solid';
+            div.style.backgroundColor = element.fillColor;
+            div.style.boxSizing = 'border-box';
+            div.style.overflow = 'visible'; // Permettre au texte de déborder du cadre
+            applyFontStyle(cellContent, element.fontStyle);
+            
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                div.style.transform = `rotate(${-element.rotation}deg)`;
+                div.style.transformOrigin = 'center center';
+            }
+            
+            div.appendChild(cellContent);
+            div.appendChild(zControls);
+            break;
+
+        case 'multicell':
+            // ✅ Utiliser la fonction de multicell-handler.js
+            renderMultiCellElement(div, element, zControls, editor);
+            return;
+
+        case 'rect':
+            div.style.width = element.width + 'mm';
+            div.style.height = element.height + 'mm';
+            div.style.borderColor = element.borderColor;
+            div.style.borderWidth = (element.borderWidth * mmToPx) + 'px';
+            div.style.borderStyle = 'solid';
+            div.style.backgroundColor = element.fillColor;
+            div.style.boxSizing = 'border-box';
+            if (element.rounded && element.radius) {
+                div.style.borderRadius = element.radius + 'mm';
+            }
+            
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                div.style.transform = `rotate(${-element.rotation}deg)`;
+                div.style.transformOrigin = 'center center';
+            }
+            
+            break;
+
+        case 'line':
+            const dx = element.x2 - element.x1;
+            const dy = element.y2 - element.y1;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            
+            div.style.width = length + 'mm';
+            div.style.height = (element.width * mmToPx) + 'px';
+            div.style.backgroundColor = element.color;
+            div.style.transform = `rotate(${angle}deg)`;
+            div.style.transformOrigin = '0 0';
+            break;
+
+        case 'circle':
+            const radiusX = element.radiusX || element.radius || 15;
+            const radiusY = element.radiusY || element.radius || 15;
+            const sizeX = radiusX * 2;
+            const sizeY = radiusY * 2;
+            div.style.width = sizeX + 'mm';
+            div.style.height = sizeY + 'mm';
+            div.style.borderRadius = '50%';
+            div.style.borderColor = element.borderColor;
+            div.style.borderWidth = (element.borderWidth * mmToPx) + 'px';
+            div.style.borderStyle = 'solid';
+            div.style.backgroundColor = element.fillColor;
+            div.style.boxSizing = 'border-box';
+            
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                div.style.transform = `rotate(${-element.rotation}deg)`;
+                div.style.transformOrigin = 'center center';
+            }
+            
+            // Mettre à jour width et height pour la logique de redimensionnement
+            element.width = sizeX;
+            element.height = sizeY;
+            break;
+
+        case 'image':
+            // Utiliser des dimensions exactes pour correspondre au PDF
+            div.style.width = element.width + 'mm';
+            div.style.height = element.height + 'mm';
+            div.style.boxSizing = 'border-box';
+            div.style.overflow = 'visible';
+            div.style.border = 'none'; // Pas de bordure par défaut
+            
+            const img = document.createElement('img');
+            img.src = element.src;
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'fill'; // Remplir exactement comme FPDF
+            img.style.pointerEvents = 'none';
+            img.style.display = 'block';
+            img.style.position = 'absolute';
+            img.style.left = '0';
+            img.style.top = '0';
+            img.style.margin = '0';
+            img.style.padding = '0';
+            
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                img.style.transform = `rotate(${-element.rotation}deg)`;
+                img.style.transformOrigin = 'center center';
+            }
+            
+            // Appliquer l'opacité si nécessaire
+            if (element.opacity && element.opacity < 100) {
+                img.style.opacity = element.opacity / 100;
+            }
+            
+            div.appendChild(img);
+            
+            // Ajouter une bordure seulement si explicitement demandée
+            if (element.border === 1) {
+                const mmToPx = 3.7795275591;
+                div.style.border = (element.borderWidth || 0.1) * mmToPx + 'px solid ' + (element.borderColor || '#000000');
+            }
+            
+            // Ajouter les contrôles z-index
+            div.appendChild(zControls);
+            break;
+
+        case 'header':
+        case 'footer':
+            div.style.width = element.width + 'mm';
+            div.style.height = element.height + 'mm';
+            
+            const headerFooterContent = document.createElement('div');
+            headerFooterContent.textContent = element.content.replace('{nb}', '1');
+            headerFooterContent.style.fontSize = element.fontSize + 'pt';
+            headerFooterContent.style.fontFamily = element.fontFamily;
+            headerFooterContent.style.color = element.color;
+            headerFooterContent.style.width = '100%';
+            headerFooterContent.style.height = '100%';
+            headerFooterContent.style.display = 'flex';
+            headerFooterContent.style.alignItems = 'center';
+            headerFooterContent.style.justifyContent = convertAlign(element.align);
+            headerFooterContent.style.pointerEvents = 'none';
+            
+            div.style.backgroundColor = element.fillColor;
+            div.style.boxSizing = 'border-box';
+            if (element.borderWidth) {
+                div.style.border = (element.borderWidth * mmToPx) + 'px solid ' + (element.borderColor || '#000000');
+            }
+            
+            // Appliquer la rotation si nécessaire
+            if (element.rotation && element.rotation !== 0) {
+                div.style.transform = `rotate(${-element.rotation}deg)`;
+                div.style.transformOrigin = 'center center';
+            }
+            
             applyFontStyle(headerFooterContent, element.fontStyle);
             div.appendChild(headerFooterContent);
             div.appendChild(zControls);

@@ -72,7 +72,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ob_end_clean();
                     chdir($oldDir);
                     
-                    throw new Exception('Le PDF n\'a pas été créé');
+                    // Debug: vérifier les erreurs
+                    $error_output = ob_get_contents();
+                    ob_end_clean();
+                    
+                    throw new Exception('Le PDF n\'a pas été créé. Output: ' . $error_output);
                 }
             } catch (Exception $e) {
                 ob_end_clean();
@@ -89,7 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'phpPath' => $phpFilepath,
                     'error' => $e->getMessage(),
                     'line' => $e->getLine(),
-                    'file' => $e->getFile()
+                    'file' => $e->getFile(),
+                    'trace' => $e->getTraceAsString()
                 ]);
             }
         } else {
