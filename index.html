@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Éditeur PDF A4</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Barre d'outils latérale -->
+        <div class="sidebar">
+            <h1>Éditeur PDF</h1>
+            
+            <div class="sidebar-section">
+                <h3>Texte</h3>
+                <button id="addText" class="btn btn-primary btn-full">
+                    <span>📝</span> Texte simple
+                </button>
+                <button id="addTextCell" class="btn btn-primary btn-full">
+                    <span>📦</span> Cellule de texte
+                </button>
+                <button id="addMultiCell" class="btn btn-primary btn-full">
+                    <span>📄</span> Texte multiligne
+                </button>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Formes</h3>
+                <button id="addRect" class="btn btn-primary btn-full">
+                    <span>⬜</span> Rectangle
+                </button>
+                <button id="addLine" class="btn btn-primary btn-full">
+                    <span>📏</span> Ligne
+                </button>
+                <button id="addCircle" class="btn btn-primary btn-full">
+                    <span>⭕</span> Cercle/Ellipse
+                </button>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Médias</h3>
+                <button id="addImage" class="btn btn-primary btn-full">
+                    <span>🖼️</span> Image
+                </button>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Page</h3>
+                <button id="addHeader" class="btn btn-secondary btn-full">
+                    <span>🔝</span> En-tête
+                </button>
+                <button id="addFooter" class="btn btn-secondary btn-full">
+                    <span>🔽</span> Pied de page
+                </button>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Fichier</h3>
+                <button id="saveFile" class="btn btn-success btn-full">
+                    <span>💾</span> Sauvegarder
+                </button>
+                <button id="openFile" class="btn btn-info btn-full">
+                    <span>📂</span> Ouvrir
+                </button>
+                <button id="exportPHP" class="btn btn-warning btn-full">
+                    <span>🐘</span> Exporter PHP
+                </button>
+                <button id="saveToServer" class="btn btn-success btn-full">
+                    <span>☁️</span> Sauvegarder sur serveur
+                </button>
+                <input type="file" id="fileInput" accept=".json" style="display:none">
+                <input type="file" id="imageInput" accept="image/jpeg,image/jpg,image/png" style="display: none;">
+            </div>
+        </div>
+
+        <!-- Zone d'édition A4 -->
+        <div class="editor-wrapper">
+            <div id="a4Page" class="a4-page"></div>
+        </div>
+    </div>
+
+    <!-- Modale d'édition -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Éditer</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div id="modalBody" class="modal-body"></div>
+            <div class="modal-footer">
+                <button id="deleteElement" class="btn btn-danger">Supprimer</button>
+                <button id="saveChanges" class="btn btn-success">Valider</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale de notification -->
+    <div id="notificationModal" class="modal notification-modal">
+        <div class="modal-content notification-content">
+            <div class="notification-icon" id="notificationIcon"></div>
+            <div class="notification-message" id="notificationMessage"></div>
+            <div class="notification-footer">
+                <button id="notificationOk" class="btn btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale de confirmation -->
+    <div id="confirmModal" class="modal confirm-modal">
+        <div class="modal-content confirm-content">
+            <div class="modal-header">
+                <h2 id="confirmTitle">Confirmation</h2>
+            </div>
+            <div class="modal-body">
+                <div id="confirmMessage"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="confirmCancel" class="btn btn-secondary">Annuler</button>
+                <button id="confirmOk" class="btn btn-primary">Confirmer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Indicateur de chargement -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div id="loadingMessage" class="loading-message">Chargement...</div>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/modal-utils.js"></script>
+    <script src="js/elements.js"></script>
+    <script src="js/rendering.js"></script>
+    <script src="js/forms.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/init.js"></script>
+    <script>
+        // Fonction globale pour adapter l'image à la page
+        function fitToPage() {
+            console.log('📄 Bouton "Adapter à la page" cliqué');
+            
+            // Appliquer immédiatement les changements
+            document.getElementById('editX').value = '0';
+            document.getElementById('editY').value = '0';
+            document.getElementById('editWidth').value = '210';
+            document.getElementById('editHeight').value = '297';
+            document.getElementById('editRotation').value = '0';
+            
+            // Sauvegarder automatiquement
+            const event = new Event('click');
+            document.getElementById('saveChanges').dispatchEvent(event);
+        }
+    </script>
+</body>
+</html>

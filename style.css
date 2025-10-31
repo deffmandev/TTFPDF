@@ -1,0 +1,610 @@
+:root {
+    --primary: #3b82f6;
+    --secondary: #64748b;
+    --success: #10b981;
+    --danger: #ef4444;
+    --info: #06b6d4;
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --text-primary: #0f172a;
+    --border: #e2e8f0;
+    --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    --sidebar-width: 250px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: row;
+}
+
+/* Barre latérale */
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.sidebar h1 {
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sidebar-section h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+/* Barre d'outils */
+.toolbar {
+    background: var(--bg-secondary);
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.toolbar h1 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.toolbar-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.separator {
+    width: 1px;
+    height: 30px;
+    background: var(--border);
+    margin: 0 0.5rem;
+}
+
+/* Boutons */
+.btn {
+    padding: 0.625rem 1rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-secondary {
+    background: var(--secondary);
+    color: white;
+}
+
+.btn-success {
+    background: var(--success);
+    color: white;
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-info {
+    background: var(--info);
+    color: white;
+}
+
+.btn-warning {
+    background: #f59e0b;
+    color: white;
+}
+
+.btn-full {
+    width: 100%;
+}
+
+/* Zone d'édition */
+.editor-wrapper {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 2rem;
+    overflow: auto;
+}
+
+.a4-page {
+    width: 210mm;
+    height: 297mm;
+    background: white;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    position: relative;
+    margin: 0 auto;
+}
+
+/* Éléments sur la page */
+.element {
+    position: absolute;
+    cursor: move;
+    transition: box-shadow 0.2s;
+    box-sizing: border-box; /* Important pour les bordures */
+}
+
+.element:hover {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+.element.selected {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+    outline: 2px dashed var(--primary);
+    outline-offset: 2px;
+}
+
+/* Forcer le box-sizing pour tous les éléments */
+.text-element,
+.textcell-element,
+.multicell-element,
+.rect-element,
+.circle-element,
+.header-element,
+.footer-element {
+    box-sizing: border-box !important;
+}
+
+/* Contrôles Z-index */
+.z-controls {
+    position: absolute;
+    top: -30px;
+    right: 0;
+    display: none;
+    gap: 2px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    z-index: 10000;
+}
+
+.z-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.z-btn:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.z-btn:first-child {
+    border-radius: 3px 0 0 3px;
+}
+
+.z-btn:last-child {
+    border-radius: 0 3px 3px 0;
+}
+
+/* Poignées de redimensionnement */
+.resize-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: var(--primary);
+    border: 2px solid white;
+    border-radius: 50%;
+    display: none;
+    z-index: 10001;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.element:hover .resize-handle,
+.element.selected .resize-handle {
+    display: block;
+}
+
+.resize-handle.bottom-right {
+    bottom: -6px;
+    right: -6px;
+    cursor: nwse-resize;
+}
+
+.resize-handle.bottom-left {
+    bottom: -6px;
+    left: -6px;
+    cursor: nesw-resize;
+}
+
+.resize-handle.top-right {
+    top: -6px;
+    right: -6px;
+    cursor: nesw-resize;
+}
+
+.resize-handle.top-left {
+    top: -6px;
+    left: -6px;
+    cursor: nwse-resize;
+}
+
+.text-element {
+    padding: 0; /* Supprimé pour correspondre exactement au PDF */
+    margin: 0;
+    min-width: 50px;
+    min-height: 20px;
+    white-space: pre-wrap;
+    line-height: 1; /* Pour correspondre à FPDF */
+}
+
+.rect-element {
+    border: 2px solid #000;
+    background: transparent;
+}
+
+.textcell-element {
+    border: 2px solid #000;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    overflow: hidden;
+}
+
+.textcell-element .cell-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    word-wrap: break-word;
+}
+
+.line-element {
+    background: #000;
+    transform-origin: left top;
+    pointer-events: auto;
+    cursor: move;
+}
+
+/* Poignées pour les lignes */
+.line-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: var(--danger);
+    border: 2px solid white;
+    border-radius: 50%;
+    display: none;
+    z-index: 10001;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    cursor: move;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+}
+
+.line-element:hover .line-handle,
+.line-element.selected .line-handle {
+    display: block;
+}
+
+.line-handle.handle-start {
+    background: var(--success);
+}
+
+.line-handle.handle-end {
+    background: var(--danger);
+}
+
+.circle-element {
+    border-radius: 50%;
+    border: 2px solid #000;
+    background: transparent;
+}
+
+.ellipse-element {
+    border-radius: 50%;
+    border: 2px solid #000;
+    background: transparent;
+}
+
+/* Image element - rendu exact pour correspondre au PDF */
+.image-element {
+    position: absolute;
+    cursor: move;
+    box-sizing: border-box;
+    overflow: visible;
+    border: none; /* Pas de bordure par défaut */
+}
+
+.image-element img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    margin: 0;
+    padding: 0;
+    object-fit: fill; /* Remplir exactement comme FPDF */
+}
+
+.image-element:hover {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+.image-element.selected {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+    outline: 2px dashed var(--primary);
+    outline-offset: 2px;
+}
+
+/* Afficher les contrôles z-index pour les images */
+.image-element:hover .z-controls,
+.image-element.selected .z-controls {
+    display: flex;
+}
+
+/* Conteneur pour la rotation des images */
+.image-element > div {
+    transition: transform 0.3s ease;
+}
+
+/* Modale */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.2s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    background: var(--bg-secondary);
+    margin: 5% auto;
+    border-radius: 1rem;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+    animation: slideIn 0.3s;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    font-size: 1.25rem;
+}
+
+.close {
+    font-size: 2rem;
+    font-weight: 300;
+    color: var(--secondary);
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover {
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Formulaires dans la modale */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* Modale de notification */
+.notification-modal .modal-content {
+    max-width: 400px;
+    text-align: center;
+}
+
+.notification-content {
+    padding: 2rem;
+}
+
+.notification-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.notification-icon.success {
+    color: var(--success);
+}
+
+.notification-icon.error {
+    color: var(--danger);
+}
+
+.notification-icon.warning {
+    color: #f59e0b;
+}
+
+.notification-icon.info {
+    color: var(--info);
+}
+
+.notification-message {
+    font-size: 1rem;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    white-space: pre-line;
+    color: var(--text-primary);
+}
+
+.notification-footer {
+    display: flex;
+    justify-content: center;
+}
+
+/* Modale de confirmation */
+.confirm-modal .modal-content {
+    max-width: 450px;
+}
+
+.confirm-content #confirmMessage {
+    font-size: 1rem;
+    line-height: 1.6;
+    white-space: pre-line;
+}
+
+/* Overlay de chargement */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.loading-spinner {
+    text-align: center;
+    background: white;
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.spinner {
+    border: 4px solid var(--border);
+    border-top: 4px solid var(--primary);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-message {
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test fitToPage</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        input { margin: 5px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test du bouton "Adapter à la page"</h1>
+    
+    <div id="test-results"></div>
+    
+    <h2>Simulation du formulaire d'édition d'image</h2>
+    <div id="mock-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Position X (mm)</label>
+                <input type="number" id="editX" value="50" step="0.1">
+            </div>
+            <div class="form-group">
+                <label>Position Y (mm)</label>
+                <input type="number" id="editY" value="50" step="0.1">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Largeur (mm)</label>
+                <input type="number" id="editWidth" value="100" step="0.1">
+            </div>
+            <div class="form-group">
+                <label>Hauteur (mm)</label>
+                <input type="number" id="editHeight" value="100" step="0.1">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Rotation (degrés)</label>
+                <input type="number" id="editRotation" value="45" min="0" max="360" step="15">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <button type="button" id="fitToPage" class="btn btn-info">
+                📄 Adapter à la page (0,0 - 210x297mm)
+            </button>
+        </div>
+        
+        <button type="button" id="saveChanges" style="display: none;">Valider</button>
+    </div>
+    
+    <h2>Actions de test</h2>
+    <button onclick="runTest()">▶️ Lancer le test automatique</button>
+    <button onclick="manualTest()">🖱️ Test manuel (cliquer sur le bouton)</button>
+    <button onclick="resetForm()">🔄 Réinitialiser</button>
+    
+    <script>
+        let testResults = [];
+        
+        function log(message, type = 'info') {
+            testResults.push({ message, type });
+            updateResults();
+        }
+        
+        function updateResults() {
+            const container = document.getElementById('test-results');
+            container.innerHTML = testResults.map(result => 
+                `<div class="test-result ${result.type}">${result.message}</div>`
+            ).join('');
+        }
+        
+        function runTest() {
+            testResults = [];
+            log('🚀 Démarrage du test automatique...', 'info');
+            
+            // Valeurs initiales
+            const initialValues = {
+                x: document.getElementById('editX').value,
+                y: document.getElementById('editY').value,
+                width: document.getElementById('editWidth').value,
+                height: document.getElementById('editHeight').value,
+                rotation: document.getElementById('editRotation').value
+            };
+            
+            log(`📊 Valeurs initiales: X=${initialValues.x}, Y=${initialValues.y}, W=${initialValues.width}, H=${initialValues.height}, R=${initialValues.rotation}`);
+            
+            // Simuler le clic sur fitToPage
+            document.getElementById('fitToPage').click();
+            
+            // Attendre un peu pour que les changements soient appliqués
+            setTimeout(() => {
+                const newValues = {
+                    x: document.getElementById('editX').value,
+                    y: document.getElementById('editY').value,
+                    width: document.getElementById('editWidth').value,
+                    height: document.getElementById('editHeight').value,
+                    rotation: document.getElementById('editRotation').value
+                };
+                
+                log(`📊 Nouvelles valeurs: X=${newValues.x}, Y=${newValues.y}, W=${newValues.width}, H=${newValues.height}, R=${newValues.rotation}`);
+                
+                // Vérifications
+                let allGood = true;
+                
+                if (newValues.x !== '0') {
+                    log(`❌ ERREUR: X devrait être 0, mais est ${newValues.x}`, 'error');
+                    allGood = false;
+                } else {
+                    log('✅ X correctement défini à 0', 'success');
+                }
+                
+                if (newValues.y !== '0') {
+                    log(`❌ ERREUR: Y devrait être 0, mais est ${newValues.y}`, 'error');
+                    allGood = false;
+                } else {
+                    log('✅ Y correctement défini à 0', 'success');
+                }
+                
+                if (newValues.width !== '210') {
+                    log(`❌ ERREUR: Largeur devrait être 210, mais est ${newValues.width}`, 'error');
+                    allGood = false;
+                } else {
+                    log('✅ Largeur correctement définie à 210', 'success');
+                }
+                
+                if (newValues.height !== '297') {
+                    log(`❌ ERREUR: Hauteur devrait être 297, mais est ${newValues.height}`, 'error');
+                    allGood = false;
+                } else {
+                    log('✅ Hauteur correctement définie à 297', 'success');
+                }
+                
+                if (newValues.rotation !== '0') {
+                    log(`❌ ERREUR: Rotation devrait être 0, mais est ${newValues.rotation}`, 'error');
+                    allGood = false;
+                } else {
+                    log('✅ Rotation correctement définie à 0', 'success');
+                }
+                
+                if (allGood) {
+                    log('🎉 TEST RÉUSSI: Toutes les valeurs sont correctes!', 'success');
+                } else {
+                    log('💥 TEST ÉCHOUÉ: Certaines valeurs sont incorrectes', 'error');
+                }
+                
+                log('🏁 Test terminé', 'info');
+            }, 100);
+        }
+        
+        function manualTest() {
+            log('🖱️ Test manuel: Cliquez sur le bouton "Adapter à la page"', 'info');
+        }
+        
+        function resetForm() {
+            document.getElementById('editX').value = '50';
+            document.getElementById('editY').value = '50';
+            document.getElementById('editWidth').value = '100';
+            document.getElementById('editHeight').value = '100';
+            document.getElementById('editRotation').value = '45';
+            testResults = [];
+            updateResults();
+            log('🔄 Formulaire réinitialisé', 'info');
+        }
+        
+        // Configuration du bouton fitToPage (même code que dans forms.js)
+        document.getElementById('fitToPage').addEventListener('click', () => {
+            log('📄 Bouton "Adapter à la page" cliqué', 'info');
+            
+            // Appliquer immédiatement les changements
+            document.getElementById('editX').value = '0';
+            document.getElementById('editY').value = '0';
+            document.getElementById('editWidth').value = '210';
+            document.getElementById('editHeight').value = '297';
+            document.getElementById('editRotation').value = '0';
+            
+            log('✏️ Valeurs mises à jour dans le formulaire', 'info');
+            
+            // Simuler la sauvegarde (comme dans l'éditeur réel)
+            const event = new Event('click');
+            const saveBtn = document.getElementById('saveChanges');
+            if (saveBtn) {
+                saveBtn.dispatchEvent(event);
+                log('💾 Sauvegarde simulée déclenchée', 'info');
+            }
+        });
+        
+        // Initialisation
+        log('📋 Test prêt. Cliquez sur "Lancer le test automatique" ou testez manuellement.', 'info');
+    </script>
+</body>
+</html>
