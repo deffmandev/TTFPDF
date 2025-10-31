@@ -1,0 +1,311 @@
+/* Style général pour l'éditeur PDF */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f9;
+}
+
+h1, h2, h3 {
+    color: #333;
+}
+
+a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Conteneur principal */
+#app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 40px);
+}
+
+/* Barre de navigation */
+nav {
+    background-color: #007bff;
+    color: #fff;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+nav h1 {
+    font-size: 24px;
+    margin: 0;
+}
+
+nav button {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+nav button:hover {
+    text-decoration: underline;
+}
+
+/* Panneaux latéraux */
+.sidebar {
+    background-color: #fff;
+    border-right: 1px solid #ddd;
+    padding: 20px;
+    width: 250px;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.sidebar button {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    padding: 10px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.sidebar button:hover {
+    background-color: #0056b3;
+}
+
+/* Zone de travail */
+#editor {
+    flex: 1;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+}
+
+#editor h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+/* Éléments du PDF */
+.element {
+    position: absolute;
+    border: 1px dashed #007bff;
+    border-radius: 4px;
+    padding: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: #fff;
+    resize: both;
+    overflow: hidden;
+}
+
+.element.selected {
+    border-color: #0056b3;
+    box-shadow: 0 0 10px rgba(0, 86, 179, 0.5);
+}
+
+/* Poignée de redimensionnement standard (bas-droite) */
+.resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    background: #007bff;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: nwse-resize;
+    font-size: 10px;
+    z-index: 1000;
+    user-select: none;
+    pointer-events: auto;
+}
+
+.resize-handle:hover {
+    background: #0056b3;
+}
+
+/* Poignée spéciale pour multicell (barre verticale droite) */
+.resize-multicell {
+    cursor: ew-resize !important;
+    width: 8px !important;
+    height: 100% !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 123, 255, 0.3) !important;
+    border-left: 2px solid #007bff !important;
+}
+
+.resize-multicell:hover {
+    background: rgba(0, 123, 255, 0.6) !important;
+}
+
+/* Panneau de droite */
+#rightPanel {
+    background-color: #fff;
+    border-left: 1px solid #ddd;
+    padding: 20px;
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+}
+
+#rightPanel h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="color"],
+select,
+textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+/* Boutons dans le panneau de droite */
+#rightPanel button {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+#rightPanel button:hover {
+    background-color: #0056b3;
+}
+
+/* Modale */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 4px;
+    width: 500px;
+    max-width: 90%;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title {
+    font-size: 18px;
+    margin: 0;
+}
+
+.close {
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.close:hover {
+    color: #ff0000;
+}
+
+/* Tableaux */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+th, td {
+    padding: 10px;
+    text-align: left;
+    border: 1px solid #ddd;
+}
+
+th {
+    background-color: #f4f4f9;
+    font-weight: bold;
+}
+
+/* Notifications */
+.notification {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+/* ⛔ BLOQUER TOTALEMENT le redimensionnement en hauteur pour les multicell */
+.element[data-type="multicell"] {
+    resize: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+}

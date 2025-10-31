@@ -5,6 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Éditeur PDF A4</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* ✅ Forcer la position absolue pour les MultiCell */
+        .multicell {
+            position: absolute !important;
+        }
+        
+        /* ✅ Espace réduit à 15mm pour le défilement */
+        .a4-page {
+            margin-bottom: 15mm !important;
+        }
+        
+        .editor-wrapper {
+            align-items: center !important;
+            justify-content: center !important;
+            padding-top: 15mm !important;
+            overflow: hidden !important;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -57,6 +75,9 @@
 
             <div class="sidebar-section">
                 <h3>Fichier</h3>
+                <button id="newDocument" class="btn btn-danger btn-full">
+                    <span>🆕</span> Nouveau
+                </button>
                 <button id="saveFile" class="btn btn-success btn-full">
                     <span>💾</span> Sauvegarder
                 </button>
@@ -66,8 +87,8 @@
                 <button id="exportPHP" class="btn btn-warning btn-full">
                     <span>🐘</span> Exporter PHP
                 </button>
-                <button id="saveToServer" class="btn btn-success btn-full">
-                    <span>☁️</span> Sauvegarder sur serveur
+                <button id="previewPDF" class="btn btn-success btn-full">
+                    <span>👁️</span> Aperçu
                 </button>
                 <input type="file" id="fileInput" accept=".json" style="display:none">
                 <input type="file" id="imageInput" accept="image/jpeg,image/jpg,image/png" style="display: none;">
@@ -77,6 +98,16 @@
         <!-- Zone d'édition A4 -->
         <div class="editor-wrapper">
             <div id="a4Page" class="a4-page"></div>
+        </div>
+
+        <!-- Panneau d'options en temps réel -->
+        <div class="right-panel" id="rightPanel">
+            <div class="right-panel-header">
+                <h3>Propriétés</h3>
+            </div>
+            <div class="right-panel-content" id="rightPanelContent">
+                <p class="no-selection">Sélectionnez un élément pour voir ses propriétés</p>
+            </div>
         </div>
     </div>
 
@@ -133,10 +164,12 @@
     <script src="js/utils.js"></script>
     <script src="js/modal-utils.js"></script>
     <script src="js/elements.js"></script>
-    <script src="js/rendering.js"></script>
+    <script src="js/multicell-handler.js"></script>
+    <script src="js/render.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/drag.js"></script>
     <script src="js/forms.js"></script>
     <script src="js/export.js"></script>
-    <script src="js/editor.js"></script>
     <script src="js/init.js"></script>
     <script>
         // Fonction globale pour adapter l'image à la page

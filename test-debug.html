@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Debug</title>
+</head>
+<body>
+    <h1>Test de synchronisation</h1>
+    <div id="testElement" style="font-size: 12pt;">Texte de test</div>
+    <input type="number" id="testInput" value="12" min="6" max="72" oninput="updateTest(this.value)">
+    
+    <script>
+        function updateTest(value) {
+            console.log('updateTest appelé avec:', value);
+            document.getElementById('testElement').style.fontSize = value + 'pt';
+        }
+        
+        // Test direct
+        console.log('Test de base...');
+        setTimeout(() => {
+            console.log('Changement de taille à 20pt');
+            document.getElementById('testElement').style.fontSize = '20pt';
+        }, 2000);
+    </script>
+</body>
+</html>

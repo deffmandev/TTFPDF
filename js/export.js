@@ -1,22 +1,7 @@
 // Export vers PHP/FPDF
 
 function generatePHPCode(editor) {
-    // Vérifier si des fonctionnalités avancées sont utilisées
-    const needsExtended = editor.elements.some(el => {
-        return (el.type === 'image' && (el.rotation || el.opacity < 100)) ||
-               (el.type === 'rect' && el.rounded);
-    });
-    
-    // Vérifier si des cercles sont utilisés
-    const hasCircles = editor.elements.some(el => el.type === 'circle');
-    
-    const fpdfRequire = needsExtended ? 
-        "require('fpdf/fpdf.php');" : 
-        "require('fpdf/fpdf.php');";
-    
-    const className = hasCircles ? 'PDF_Ellipse' : 'FPDF';
-    
-    let code = `<?php
+    let phpCode = `<?php
 // Encodage UTF-8 pour les caractères spéciaux
 header('Content-Type: text/html; charset=utf-8');
 
@@ -25,15 +10,149 @@ function utf8_to_iso8859_1($string) {
     return mb_convert_encoding($string, 'ISO-8859-1', 'UTF-8');
 }
 
-${fpdfRequire}
+require('fpdf/fpdf.php');
 
-${hasCircles ? `class PDF_Ellipse extends FPDF
+`;
+
+    // Vérifier si on a besoin de la classe AlphaPDF (opacité sur les images)
+    const needsAlpha = editor.elements.some(el => 
+        el.type === 'image' && el.opacity !== undefined && el.opacity < 100
+    );
+
+    // Vérifier si on a besoin des méthodes Circle/Ellipse
+    const needsCircle = editor.elements.some(el => el.type === 'circle');
+
+    if (needsAlpha) {
+        phpCode += `
+// Classe pour gérer la transparence (opacité)
+class AlphaPDF extends FPDF
 {
-    function Circle($x, $y, $r, $style='D')
+    protected $extgstates = array();
+
+    // alpha: real value from 0 (transparent) to 1 (opaque)
+    // bm:    blend mode, one of the following:
+    //          Normal, Multiply, Screen, Overlay, Darken, Lighten, ColorDodge, ColorBurn,
+    //          HardLight, SoftLight, Difference, Exclusion, Hue, Saturation, Color, Luminosity
+    function SetAlpha($alpha, $bm='Normal')
     {
-        $this->Ellipse($x,$y,$r,$r,$style);
+        // set alpha for stroking (CA) and non-stroking (ca) operations
+        $gs = $this->AddExtGState(array('ca'=>$alpha, 'CA'=>$alpha, 'BM'=>'/'.$bm));
+        $this->SetExtGState($gs);
     }
 
+    function AddExtGState($parms)
+    {
+        $n = count($this->extgstates)+1;
+        $this->extgstates[$n]['parms'] = $parms;
+        return $n;
+    }
+
+    function SetExtGState($gs)
+    {
+        $this->_out(sprintf('/GS%d gs', $gs));
+    }
+
+    function _enddoc()
+    {
+        if(!empty($this->extgstates) && $this->PDFVersion<'1.4')
+            $this->PDFVersion='1.4';
+        parent::_enddoc();
+    }
+
+    function _putextgstates()
+    {
+        for ($i = 1; $i <= count($this->extgstates); $i++)
+        {
+            $this->_newobj();
+            $this->extgstates[$i]['n'] = $this->n;
+            $this->_put('<</Type /ExtGState');
+            $parms = $this->extgstates[$i]['parms'];
+            $this->_put(sprintf('/ca %.3F', $parms['ca']));
+            $this->_put(sprintf('/CA %.3F', $parms['CA']));
+            $this->_put('/BM '.$parms['BM']);
+            $this->_put('>>');
+            $this->_put('endobj');
+        }
+    }
+
+    function _putresourcedict()
+    {
+        parent::_putresourcedict();
+        $this->_put('/ExtGState <<');
+        foreach($this->extgstates as $k=>$extgstate)
+            $this->_put('/GS'.$k.' '.$extgstate['n'].' 0 R');
+        $this->_put('>>');
+    }
+
+    function _putresources()
+    {
+        $this->_putextgstates();
+        parent::_putresources();
+    }
+}
+
+`;
+    }
+
+    // Classe PDF
+    phpCode += `
+class PDF extends ${needsAlpha ? 'AlphaPDF' : 'FPDF'} {
+    function Header() {
+        // Pas d'en-tête
+    }
+    
+    function Footer() {
+        // Pas de pied de page
+    }
+    
+    // ✅ Fonction RoundedRect ajoutée
+    function RoundedRect($x, $y, $w, $h, $r, $style = '') {
+        $k = $this->k;
+        $hp = $this->h;
+        if($style=='F')
+            $op='f';
+        elseif($style=='FD' or $style=='DF')
+            $op='B';
+        else
+            $op='S';
+        $MyArc = 4/3 * (sqrt(2) - 1);
+        $this->_out(sprintf('%.2f %.2f m', ($x+$r)*$k, ($hp-$y)*$k ));
+        $xc = $x+$w-$r ;
+        $yc = $y+$r;
+        $this->_out(sprintf('%.2f %.2f l', $xc*$k, ($hp-$y)*$k ));
+        $this->_Arc($xc + $r*$MyArc, $yc - $r, $xc + $r, $yc - $r*$MyArc, $xc + $r, $yc);
+        $xc = $x+$w-$r ;
+        $yc = $y+$h-$r;
+        $this->_out(sprintf('%.2f %.2f l', ($x+$w)*$k, ($hp-$yc)*$k));
+        $this->_Arc($xc + $r, $yc + $r*$MyArc, $xc + $r*$MyArc, $yc + $r, $xc, $yc + $r);
+        $xc = $x+$r ;
+        $yc = $y+$h-$r;
+        $this->_out(sprintf('%.2f %.2f l', $xc*$k, ($hp-($y+$h))*$k));
+        $this->_Arc($xc - $r*$MyArc, $yc + $r, $xc - $r, $yc + $r*$MyArc, $xc - $r, $yc);
+        $xc = $x+$r ;
+        $yc = $y+$r;
+        $this->_out(sprintf('%.2f %.2f l', ($x)*$k, ($hp-$yc)*$k ));
+        $this->_Arc($xc - $r, $yc - $r*$MyArc, $xc - $r*$MyArc, $yc - $r, $xc, $yc - $r);
+        $this->_out($op);
+    }
+    
+    function _Arc($x1, $y1, $x2, $y2, $x3, $y3) {
+        $h = $this->h;
+        $this->_out(sprintf('%.2f %.2f %.2f %.2f %.2f %.2f c ', $x1*$this->k, ($h-$y1)*$this->k,
+            $x2*$this->k, ($h-$y2)*$this->k, $x3*$this->k, ($h-$y3)*$this->k));
+    }
+`;
+
+    // Ajouter les méthodes Circle et Ellipse si nécessaire
+    if (needsCircle) {
+        phpCode += `
+    // Méthode pour dessiner un cercle
+    function Circle($x, $y, $r, $style='D')
+    {
+        $this->Ellipse($x, $y, $r, $r, $style);
+    }
+    
+    // Méthode pour dessiner une ellipse
     function Ellipse($x, $y, $rx, $ry, $style='D')
     {
         if($style=='F')
@@ -65,74 +184,95 @@ ${hasCircles ? `class PDF_Ellipse extends FPDF
             ($x+$rx)*$k,($h-$y)*$k,
             $op));
     }
-}
-` : ''}
-
-class PDF extends ${className} {
-    function Header() {
-${generateHeaderCode(editor)}
+`;
     }
-    
-    function Footer() {
-${generateFooterCode(editor)}
-    }
-}
 
-$pdf = new PDF('${editor.pageSettings.orientation}', 'mm', '${editor.pageSettings.format}');
+    phpCode += `}
+
+$pdf = new PDF('${editor.pageSettings.orientation}', '${editor.pageSettings.unit}', '${editor.pageSettings.format}');
 // Marges définies à 0 - les éléments se positionnent directement sur la page
 $pdf->SetMargins(0, 0, 0, 0);
 // Désactiver le saut de page automatique
 $pdf->SetAutoPageBreak(false);
-$pdf->SetTitle('Document PDF créé avec PHP');
+$pdf->SetTitle('Outil création PDF par PHP', true);
+$pdf->SetAuthor('DUSSERRE Frédéric', true);
+$pdf->SetCreator('Version 1.0', true);
+$pdf->SetKeywords('FPDF, PDF, document, PHP, TTFPDF', true);
+$pdf->SetSubject('creation rapide php pour FPDF', true);
 $pdf->AddPage();
 
 `;
 
     const others = editor.elements.filter(e => e.type !== 'header' && e.type !== 'footer');
     others.forEach(el => {
-        code += generateElementPHP(el);
+        phpCode += generateElementPHP(el);
     });
 
-    code += `
+    phpCode += `
 $pdf->Output('I', 'document.pdf');
 ?>`;
 
-    return code;
+    return phpCode;
 }
 
-function generateHeaderCode(editor) {
-    const headers = editor.elements.filter(e => e.type === 'header');
-    if (headers.length === 0) return '        // Pas d\'en-tête';
-    
-    let code = '';
-    headers.forEach(el => {
-        code += `        $this->SetFont('${el.fontFamily}', '${el.fontStyle}', ${el.fontSize});\n`;
-        code += `        $this->SetTextColor(${hexToRGB(el.color)});\n`;
-        if (el.fillColor !== 'transparent') {
-            code += `        $this->SetFillColor(${hexToRGB(el.fillColor)});\n`;
-        }
-        code += `        $this->Cell(0, ${el.height}, utf8_to_iso8859_1('${el.content}'), 0, 0, '${el.align}', ${el.fillColor !== 'transparent' ? 'true' : 'false'});\n`;
-        code += `        $this->Ln();\n`;
-    });
-    return code;
+// Fonction pour échapper les caractères spéciaux
+function escapeString(str) {
+    if (!str) return '';
+    // Préserver les sauts de ligne pour les textes multilignes
+    return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '');
 }
 
-function generateFooterCode(editor) {
-    const footers = editor.elements.filter(e => e.type === 'footer');
-    if (footers.length === 0) return '        // Pas de pied de page';
+// Fonction pour convertir HEX en RGB (format chaîne pour PHP)
+function hexToRGB(hex) {
+    const rgb = hexToRgb(hex);
+    return `${rgb.r}, ${rgb.g}, ${rgb.b}`;
+}
+
+// Fonction pour convertir HEX en RGB (format objet)
+function hexToRgb(hex) {
+    // Valeur par défaut si hex est invalide
+    if (!hex || typeof hex !== 'string') {
+        console.warn('⚠️ Couleur invalide:', hex, '- Utilisation de noir');
+        return { r: 0, g: 0, b: 0 };
+    }
     
-    let code = '';
-    footers.forEach(el => {
-        code += `        $this->SetY(-${el.height});\n`;
-        code += `        $this->SetFont('${el.fontFamily}', '${el.fontStyle}', ${el.fontSize});\n`;
-        code += `        $this->SetTextColor(${hexToRGB(el.color)});\n`;
-        if (el.fillColor !== 'transparent') {
-            code += `        $this->SetFillColor(${hexToRGB(el.fillColor)});\n`;
-        }
-        const content = el.content.replace('{nb}', '\' . $this->PageNo() . \'');
-        code += `        $this->Cell(0, ${el.height}, utf8_to_iso8859_1('${content}'), 0, 0, '${el.align}', ${el.fillColor !== 'transparent' ? 'true' : 'false'});\n`;
-    });
-    return code;
+    // Supprimer le # si présent
+    hex = hex.replace('#', '');
+    
+    // Gérer les formats courts (ex: #FFF)
+    if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    
+    // Convertir en RGB
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    // Vérifier que les valeurs sont valides
+    if (isNaN(r) || isNaN(g) || isNaN(b)) {
+        console.warn('⚠️ Conversion RGB échouée pour:', hex);
+        return { r: 0, g: 0, b: 0 };
+    }
+    
+    return { r, g, b };
+}
+
+// Fonction pour obtenir le nom du type d'élément
+function getElementTypeName(type) {
+    const names = {
+        'text': 'Texte',
+        'textcell': 'Cellule de texte',
+        'multicell': 'Texte multiligne',
+        'rect': 'Rectangle',
+        'line': 'Ligne',
+        'circle': 'Cercle',
+        'image': 'Image',
+        'barcode': 'Code-barres',
+        'header': 'En-tête',
+        'footer': 'Pied de page'
+    };
+    return names[type] || type;
 }
 
 function generateElementPHP(el) {
@@ -215,25 +355,32 @@ function generateElementPHP(el) {
             break;
 
         case 'circle':
-            code += `$pdf->SetDrawColor(${hexToRGB(el.borderColor)});\n`;
-            if (el.fillColor !== 'transparent') {
-                code += `$pdf->SetFillColor(${hexToRGB(el.fillColor)});\n`;
-            }
-            code += `$pdf->SetLineWidth(${el.borderWidth});\n`;
-            // FPDF Ellipse: centre de l'ellipse aux coordonnées spécifiées
-            // Dans l'éditeur, l'ellipse est positionnée à x,y avec taille radiusX*2, radiusY*2
-            // Donc le centre est à x + radiusX, y + radiusY
-            const centerX = el.x + (el.radiusX || el.radius);
-            const centerY = el.y + (el.radiusY || el.radius);
-            const radiusX = el.radiusX || el.radius;
-            const radiusY = el.radiusY || el.radius;
+            const circleBorderRGB = hexToRgb(el.borderColor || '#000000');
             
-            if (radiusX === radiusY) {
-                // Cercle
-                code += `$pdf->Circle(${centerX}, ${centerY}, ${radiusX}, '${el.fillColor !== 'transparent' ? 'DF' : 'D'}');\n`;
+            code += `$pdf->SetDrawColor(${circleBorderRGB.r}, ${circleBorderRGB.g}, ${circleBorderRGB.b});\n`;
+            code += `$pdf->SetLineWidth(${el.borderWidth || 0.1});\n`;
+            
+            // Couleur de remplissage
+            if (el.fillColor && el.fillColor !== 'transparent') {
+                const circleFillRGB = hexToRgb(el.fillColor);
+                code += `$pdf->SetFillColor(${circleFillRGB.r}, ${circleFillRGB.g}, ${circleFillRGB.b});\n`;
+            }
+            
+            // Calculer le centre et les rayons
+            const centerX = parseFloat(el.x) + parseFloat(el.radiusX || el.radius || 15);
+            const centerY = parseFloat(el.y) + parseFloat(el.radiusY || el.radius || 15);
+            const radiusX = parseFloat(el.radiusX || el.radius || 15);
+            const radiusY = parseFloat(el.radiusY || el.radius || 15);
+            
+            // Déterminer le style
+            const circleHasFill = el.fillColor && el.fillColor !== 'transparent';
+            const circleStyle = circleHasFill ? 'FD' : 'D';
+            
+            // Vérifier si c'est un cercle parfait ou une ellipse
+            if (Math.abs(radiusX - radiusY) < 0.01) {
+                code += `$pdf->Circle(${centerX}, ${centerY}, ${radiusX}, '${circleStyle}');\n`;
             } else {
-                // Ellipse
-                code += `$pdf->Ellipse(${centerX}, ${centerY}, ${radiusX}, ${radiusY}, '${el.fillColor !== 'transparent' ? 'DF' : 'D'}');\n`;
+                code += `$pdf->Ellipse(${centerX}, ${centerY}, ${radiusX}, ${radiusY}, '${circleStyle}');\n`;
             }
             break;
 
@@ -300,11 +447,4 @@ function generateElementPHP(el) {
     }
 
     return code;
-}
-
-// Fonction pour échapper les caractères spéciaux
-function escapeString(str) {
-    if (!str) return '';
-    // Préserver les sauts de ligne pour les textes multilignes
-    return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
 }

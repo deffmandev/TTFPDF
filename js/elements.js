@@ -38,13 +38,13 @@ const ElementFactory = {
     },
 
     createMultiCell() {
-        return {
+        const element = {
             id: Date.now(),
             type: 'multicell',
             x: 50,
             y: 50,
-            width: 180,
-            minHeight: 60,
+            width: 116, // Valeur par défaut fixée à 116mm
+            minHeight: 1, // Valeur par défaut fixée à 1mm
             content: 'Texte multiligne qui s\'adapte automatiquement à la hauteur nécessaire.',
             fontSize: 10,
             fontFamily: 'Arial',
@@ -55,8 +55,13 @@ const ElementFactory = {
             borderWidth: 0.1,
             fillColor: 'transparent',
             border: 1,
-            lineHeight: 5
+            lineHeight: 5 // Valeur par défaut à 5mm
         };
+        
+        // La largeur reste fixée à 116mm, pas de calcul automatique
+        // element.width = Math.min(estimatedWidth, 180); // Commenté
+        
+        return element;
     },
 
     createRect() {
@@ -93,13 +98,16 @@ const ElementFactory = {
         return {
             id: Date.now(),
             type: 'circle',
-            x: 100,
-            y: 100,
-            radius: 50,
+            x: 50,
+            y: 50,
+            radius: 15,
+            radiusX: 15,
+            radiusY: 15,
+            width: 30,
+            height: 30,
             borderColor: '#000000',
             borderWidth: 0.1,
-            fillColor: 'transparent',
-            style: 'D'
+            fillColor: 'transparent'
         };
     },
 

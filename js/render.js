@@ -5,6 +5,7 @@ function renderElement(element, editor) {
     const div = document.createElement('div');
     div.className = `element ${element.type}-element`;
     div.dataset.id = element.id;
+    div.style.position = 'absolute'; // ✅ Forcer position absolute pour tous les éléments
     
     if (element.zIndex === undefined) {
         element.zIndex = editor.elements.indexOf(element);
@@ -30,7 +31,7 @@ function renderElement(element, editor) {
         addResizeHandles(div, element, editor);
     }
 
-    renderElementContent(div, element, zControls);
+    renderElementContent(div, element, zControls, editor);
 
     div.addEventListener('mousedown', (e) => startDrag(e, element, editor));
     div.addEventListener('dblclick', (e) => {
@@ -38,11 +39,18 @@ function renderElement(element, editor) {
         editor.editElement(element);
     });
 
+    // ✅ Clic droit pour désélectionner l'élément
+    div.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        editor.selectElement(null);
+    });
+
     page.appendChild(div);
 }
 
 function needsResizeHandles(type) {
-    return ['textcell', 'multicell', 'rect', 'circle', 'image', 'header', 'footer'].includes(type);
+    return ['textcell', 'rect', 'circle', 'image', 'header', 'footer'].includes(type);
 }
 
 function addResizeHandles(div, element, editor) {
@@ -94,6 +102,9 @@ function updateLineHandles(div, element) {
 }
 
 function startLineResize(e, element, editor, handleType) {
+    // ✅ Empêcher le redimensionnement de ligne avec le bouton droit
+    if (e.button !== 0) return;
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -103,27 +114,29 @@ function startLineResize(e, element, editor, handleType) {
     const pxToMm = 1 / mmToPx;
 
     const onMouseMove = (e) => {
-        const x = (e.clientX - pageRect.left) * pxToMm;
-        const y = (e.clientY - pageRect.top) * pxToMm;
+        // ✅ Compensation du zoom pour les coordonnées des poignées de ligne
+        const zoomFactor = editor.zoom || 1;
+        const adjustedClientX = e.clientX / zoomFactor;
+        const adjustedClientY = e.clientY / zoomFactor;
+        
+        const x = (adjustedClientX - pageRect.left) * pxToMm;
+        const y = (adjustedClientY - pageRect.top) * pxToMm;
 
         if (handleType === 'start') {
-            element.x1 = Math.min(x, element.x2 - 1);
+            // Empêcher x1 >= x2 ou y1 >= y2
+            element.x1 = Math.min(x, element.x2 - 1); // -1 pour éviter l'égalité
             element.y1 = Math.min(y, element.y2 - 1);
             element.x1 = Math.max(0, element.x1);
             element.y1 = Math.max(0, element.y1);
         } else {
-            element.x2 = Math.max(x, element.x1 + 1);
+            // Empêcher x2 <= x1 ou y2 <= y1
+            element.x2 = Math.max(x, element.x1 + 1); // +1 pour éviter l'égalité
             element.y2 = Math.max(y, element.y1 + 1);
             element.x2 = Math.min(210, element.x2);
             element.y2 = Math.min(297, element.y2);
         }
 
         editor.refreshPage();
-
-        // Mettre à jour le panneau droit
-        if (editor.selectedElement && editor.selectedElement.id === element.id) {
-            editor.updateRightPanelValues(element);
-        }
     };
 
     const onMouseUp = () => {
@@ -136,22 +149,32 @@ function startLineResize(e, element, editor, handleType) {
 }
 
 function startResize(e, element, editor, position) {
+    // ✅ Empêcher le redimensionnement avec le bouton droit
+    if (e.button !== 0) return;
+
     e.preventDefault();
     e.stopPropagation();
 
     const mmToPx = 3.7795275591;
     const pxToMm = 1 / mmToPx;
 
-    const startX = e.clientX;
-    const startY = e.clientY;
+    // ✅ Compensation du zoom pour les coordonnées initiales du redimensionnement
+    const zoomFactor = editor.zoom || 1;
+    const startX = e.clientX / zoomFactor;
+    const startY = e.clientY / zoomFactor;
     const startWidth = element.width || 0;
     const startHeight = element.height || element.minHeight || 0;
     const startPosX = element.x;
     const startPosY = element.y;
 
     const onMouseMove = (e) => {
-        const deltaX = (e.clientX - startX) * pxToMm;
-        const deltaY = (e.clientY - startY) * pxToMm;
+        // ✅ Compensation du zoom pour les deltas de redimensionnement
+        const zoomFactor = editor.zoom || 1;
+        const adjustedClientX = e.clientX / zoomFactor;
+        const adjustedClientY = e.clientY / zoomFactor;
+        
+        const deltaX = (adjustedClientX - startX) * pxToMm;
+        const deltaY = (adjustedClientY - startY) * pxToMm;
 
         switch(position) {
             case 'bottom-right':
@@ -159,6 +182,7 @@ function startResize(e, element, editor, position) {
                 if (element.type === 'multicell') {
                     element.minHeight = Math.max(1, startHeight + deltaY);
                 } else if (element.type === 'circle') {
+                    // Pour les cercles, ajuster radiusX et radiusY
                     element.radiusX = element.width / 2;
                     element.radiusY = Math.max(1, startHeight + deltaY) / 2;
                 } else {
@@ -172,6 +196,7 @@ function startResize(e, element, editor, position) {
                 if (element.type === 'multicell') {
                     element.minHeight = Math.max(1, startHeight + deltaY);
                 } else if (element.type === 'circle') {
+                    // Pour les cercles, ajuster radiusX et radiusY
                     element.radiusX = element.width / 2;
                     element.radiusY = Math.max(1, startHeight + deltaY) / 2;
                 } else {
@@ -184,6 +209,7 @@ function startResize(e, element, editor, position) {
                 if (element.type === 'multicell') {
                     element.minHeight = newHeight;
                 } else if (element.type === 'circle') {
+                    // Pour les cercles, ajuster radiusX et radiusY
                     element.radiusX = element.width / 2;
                     element.radiusY = newHeight / 2;
                 } else {
@@ -198,6 +224,7 @@ function startResize(e, element, editor, position) {
                 if (element.type === 'multicell') {
                     element.minHeight = newH;
                 } else if (element.type === 'circle') {
+                    // Pour les cercles, ajuster radiusX et radiusY
                     element.radiusX = element.width / 2;
                     element.radiusY = newH / 2;
                 } else {
@@ -213,11 +240,6 @@ function startResize(e, element, editor, position) {
         }
 
         editor.refreshPage();
-
-        // Mettre à jour le panneau droit
-        if (editor.selectedElement && editor.selectedElement.id === element.id) {
-            editor.updateRightPanelValues(element);
-        }
     };
 
     const onMouseUp = () => {
@@ -241,18 +263,24 @@ function createZControls(element, editor) {
     zControls.addEventListener('mousedown', (e) => e.stopPropagation());
     
     zControls.querySelector('.z-up').addEventListener('click', (e) => {
+        // ✅ Empêcher l'action avec le bouton droit
+        if (e.button !== 0) return;
         e.stopPropagation();
         e.preventDefault();
         moveElementUp(element, editor);
     });
     
     zControls.querySelector('.z-down').addEventListener('click', (e) => {
+        // ✅ Empêcher l'action avec le bouton droit
+        if (e.button !== 0) return;
         e.stopPropagation();
         e.preventDefault();
         moveElementDown(element, editor);
     });
 
     zControls.querySelector('.z-delete').addEventListener('click', async (e) => {
+        // ✅ Empêcher l'action avec le bouton droit
+        if (e.button !== 0) return;
         e.stopPropagation();
         e.preventDefault();
         const confirmed = await modalManager.showConfirm(
@@ -284,7 +312,7 @@ function moveElementDown(element, editor) {
     }
 }
 
-function renderElementContent(div, element, zControls) {
+function renderElementContent(div, element, zControls, editor) {
     const mmToPx = 3.7795275591;
     
     switch(element.type) {
@@ -331,41 +359,9 @@ function renderElementContent(div, element, zControls) {
             break;
 
         case 'multicell':
-            div.style.width = element.width + 'mm';
-            div.style.minHeight = element.minHeight + 'mm';
-            
-            const multiContent = document.createElement('div');
-            // Préserver les sauts de ligne comme dans FPDF MultiCell
-            const formattedContent = element.content.replace(/\\n/g, '\n');
-            multiContent.textContent = formattedContent;
-            multiContent.style.fontSize = element.fontSize + 'pt';
-            multiContent.style.fontFamily = element.fontFamily;
-            multiContent.style.color = element.color;
-            multiContent.style.width = '100%';
-            multiContent.style.minHeight = '100%';
-            multiContent.style.textAlign = convertAlign(element.align);
-            multiContent.style.pointerEvents = 'none';
-            multiContent.style.wordWrap = 'break-word';
-            multiContent.style.whiteSpace = 'pre-line'; // Préserver les sauts de ligne
-            multiContent.style.overflowWrap = 'break-word';
-            multiContent.style.padding = '4px';
-            
-            div.style.borderColor = element.borderColor;
-            div.style.borderWidth = (element.borderWidth * mmToPx) + 'px';
-            div.style.borderStyle = 'solid';
-            div.style.backgroundColor = element.fillColor;
-            div.style.boxSizing = 'border-box';
-            applyFontStyle(multiContent, element.fontStyle);
-            
-            // Appliquer la hauteur de ligne pour correspondre au PDF FPDF
-            // FPDF utilise la hauteur de ligne en mm, nous convertissons pour CSS
-            const lineHeightMm = element.lineHeight || (element.fontSize * 1.2);
-            const lineHeightPx = (lineHeightMm / 25.4) * 96; // Conversion mm vers px (96 DPI)
-            multiContent.style.lineHeight = lineHeightPx + 'px';
-            
-            div.appendChild(multiContent);
-            div.appendChild(zControls);
-            break;
+            // ✅ Utiliser la fonction de multicell-handler.js
+            renderMultiCellElement(div, element, zControls, editor);
+            return;
 
         case 'rect':
             div.style.width = element.width + 'mm';
@@ -456,27 +452,6 @@ function renderElementContent(div, element, zControls) {
             div.appendChild(zControls);
             break;
 
-        case 'barcode':
-            div.style.width = element.width + 'mm';
-            div.style.height = element.height + 'mm';
-            div.style.border = '1px solid #ccc';
-            div.style.backgroundColor = '#f9f9f9';
-            div.style.display = 'flex';
-            div.style.flexDirection = 'column';
-            div.style.alignItems = 'center';
-            div.style.justifyContent = 'center';
-            div.style.fontSize = '12px';
-            div.style.color = '#666';
-            div.style.fontFamily = 'monospace';
-            
-            const barcodeContent = document.createElement('div');
-            barcodeContent.textContent = `${element.barcodeType || 'C128'}: ${element.code || '123456789'}`;
-            barcodeContent.style.pointerEvents = 'none';
-            
-            div.appendChild(barcodeContent);
-            div.appendChild(zControls);
-            break;
-
         case 'header':
         case 'footer':
             div.style.width = element.width + 'mm';
@@ -514,6 +489,9 @@ function startDrag(e, element, editor) {
         return;
     }
 
+    // ✅ Empêcher le drag avec le bouton droit - réservé au déplacement de la feuille
+    if (e.button !== 0) return;
+
     e.preventDefault();
     e.stopPropagation();
     
@@ -528,6 +506,7 @@ function startDrag(e, element, editor) {
     let currentX, currentY;
     
     if (element.type === 'line') {
+        // Pour les lignes, utiliser le centre comme point de référence
         currentX = (element.x1 + element.x2) / 2;
         currentY = (element.y1 + element.y2) / 2;
     } else {
@@ -535,32 +514,47 @@ function startDrag(e, element, editor) {
         currentY = element.y;
     }
     
-    editor.offset.x = e.clientX - pageRect.left - (currentX * mmToPx);
-    editor.offset.y = e.clientY - pageRect.top - (currentY * mmToPx);
+    // ✅ Compensation du zoom pour l'offset initial
+    const zoomFactor = editor.zoom || 1;
+    const adjustedClientX = e.clientX / zoomFactor;
+    const adjustedClientY = e.clientY / zoomFactor;
+    
+    editor.offset.x = adjustedClientX - pageRect.left - (currentX * mmToPx);
+    editor.offset.y = adjustedClientY - pageRect.top - (currentY * mmToPx);
 
     const onMouseMove = (e) => {
         if (!editor.isDragging) return;
         
         const pxToMm = 1 / mmToPx;
-        const x = (e.clientX - pageRect.left - editor.offset.x) * pxToMm;
-        const y = (e.clientY - pageRect.top - editor.offset.y) * pxToMm;
+        // ✅ Compensation du zoom pour les coordonnées de souris
+        const zoomFactor = editor.zoom || 1;
+        const adjustedClientX = e.clientX / zoomFactor;
+        const adjustedClientY = e.clientY / zoomFactor;
+        
+        const x = (adjustedClientX - pageRect.left - editor.offset.x) * pxToMm;
+        const y = (adjustedClientY - pageRect.top - editor.offset.y) * pxToMm;
         
         if (element.type === 'line') {
+            // Déplacer la ligne en gardant ses dimensions
             const dx = element.x2 - element.x1;
             const dy = element.y2 - element.y1;
             
+            // Bloquer le déplacement si dx ou dy est nul (ligne dégénérée)
             if (dx === 0 || dy === 0) {
-                return;
+                return; // Ne pas déplacer si la ligne est dégénérée
             }
             
+            // Calculer le nouveau centre
             const centerX = x;
             const centerY = y;
             
+            // Recalculer x1,y1 et x2,y2
             element.x1 = centerX - dx / 2;
             element.y1 = centerY - dy / 2;
             element.x2 = centerX + dx / 2;
             element.y2 = centerY + dy / 2;
             
+            // S'assurer que x1 <= x2 et y1 <= y2 pendant le déplacement
             if (element.x1 > element.x2) {
                 [element.x1, element.x2] = [element.x2, element.x1];
             }
@@ -568,6 +562,7 @@ function startDrag(e, element, editor) {
                 [element.y1, element.y2] = [element.y2, element.y1];
             }
             
+            // Contraindre dans la page
             const minX = Math.min(element.x1, element.x2);
             const maxX = Math.max(element.x1, element.x2);
             const minY = Math.min(element.y1, element.y2);
@@ -594,6 +589,7 @@ function startDrag(e, element, editor) {
                 element.y2 -= offset;
             }
         } else {
+            // Contraintes normales pour les autres éléments
             const maxX = 210 - (element.width || 0);
             const maxY = 297 - (element.minHeight || element.height || 0);
             
@@ -619,11 +615,6 @@ function startDrag(e, element, editor) {
             div.style.transform = `rotate(${angle}deg)`;
             updateLineHandles(div, element);
         }
-
-        // Mettre à jour le panneau droit
-        if (editor.selectedElement && editor.selectedElement.id === element.id) {
-            editor.updateRightPanelValues(element);
-        }
     };
 
     const onMouseUp = () => {
@@ -635,327 +626,4 @@ function startDrag(e, element, editor) {
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
-}
-
-function generateBarcodePreview(element) {
-    const code = element.code || '123456789';
-    const type = element.barcodeType || 'C128';
-    
-    return `<div style="font-size: 10px; color: #666;">${type}: ${code}</div>`;
-}
-
-function generateCode39Preview(code) {
-    // Code 39 avec encodage identique à PHP
-    const chars = ('*' + code.toUpperCase() + '*').split('');
-    let bars = '';
-    
-    const code39Table = {
-        '0': '111221211', '1': '211211112', '2': '112211112', '3': '212211111',
-        '4': '111221112', '5': '211221111', '6': '112221111', '7': '111211212',
-        '8': '211211211', '9': '112211211', 'A': '211112112', 'B': '112112112',
-        'C': '212112111', 'D': '111122112', 'E': '211122111', 'F': '112122111',
-        'G': '111112212', 'H': '211112211', 'I': '112112211', 'J': '111122211',
-        'K': '211111122', 'L': '112111122', 'M': '212111121', 'N': '111121122',
-        'O': '211121121', 'P': '112121121', 'Q': '111111222', 'R': '211111221',
-        'S': '112111221', 'T': '111121221', 'U': '221111112', 'V': '122111112',
-        'W': '222111111', 'X': '121121112', 'Y': '221121111', 'Z': '122121111',
-        '-': '121111212', '.': '221111211', ' ': '122111211', '$': '121212111',
-        '/': '121211121', '+': '121112121', '%': '111212121', '*': '121121211'
-    };
-    
-    chars.forEach(char => {
-        const pattern = code39Table[char];
-        if (pattern) {
-            for(let i = 0; i < pattern.length; i++) {
-                const barWidth = parseInt(pattern[i]);
-                const width = barWidth + 'px';
-                const color = (i % 2 === 0) ? 'black' : 'white';
-                bars += `<div style="display: inline-block; width: ${width}; height: 24px; background: ${color};"></div>`;
-            }
-        }
-        // Espace inter-caractères (comme dans PHP)
-        bars += '<div style="display: inline-block; width: 1px; height: 24px; background: white;"></div>';
-    });
-    
-    return `<div style="display: flex; align-items: end; background: white; border: 1px solid #ddd; padding: 4px; margin: 2px 0;">${bars}</div>`;
-}
-
-function generateCode128Preview(code) {
-    // Code 128 avec logique simplifiée mais cohérente avec PHP
-    let bars = '';
-    
-    // Start Code B (comme dans PHP simplifié)
-    bars += '<div style="display: inline-block; width: 2px; height: 28px; background: black;"></div>';
-    bars += '<div style="display: inline-block; width: 1px; height: 28px; background: white;"></div>';
-    bars += '<div style="display: inline-block; width: 2px; height: 28px; background: black;"></div>';
-    bars += '<div style="display: inline-block; width: 3px; height: 28px; background: white;"></div>';
-    
-    // Encodage des données (même logique que PHP)
-    for(let i = 0; i < Math.min(code.length, 15); i++) {
-        const char = code[i];
-        const charCode = char.charCodeAt(0) - 32; // Même calcul que PHP
-        
-        // Pattern basé sur les bits du charCode
-        for(let j = 0; j < 6; j++) {
-            const bit = (charCode >> j) & 1;
-            const width = bit ? '2px' : '1px';
-            const color = (j % 2 === 0) ? 'black' : 'white';
-            bars += `<div style="display: inline-block; width: ${width}; height: 28px; background: ${color};"></div>`;
-        }
-    }
-    
-    // Checksum et stop (simplifié comme PHP)
-    bars += '<div style="display: inline-block; width: 2px; height: 28px; background: black;"></div>';
-    bars += '<div style="display: inline-block; width: 3px; height: 28px; background: white;"></div>';
-    bars += '<div style="display: inline-block; width: 1px; height: 28px; background: black;"></div>';
-    
-    return `<div style="display: flex; align-items: end; background: white; border: 1px solid #ddd; padding: 4px; margin: 2px 0;">${bars}</div>`;
-}
-
-function generateEAN13Preview(code) {
-    // EAN-13 avec logique identique à PHP
-    let bars = '';
-    
-    // Calcul du checksum (même fonction que PHP)
-    let fullCode = code.padEnd(12, '0').substring(0, 12);
-    const checksum = calculateEAN13Checksum(fullCode);
-    fullCode += checksum;
-    
-    // Patterns identiques à PHP
-    const leftOdd = ['3211', '2221', '2122', '1411', '1132'];
-    const leftEven = ['1123', '1222', '2212', '1141', '2311'];
-    const rightPatterns = ['3211', '2221', '2122', '1411', '1132'];
-    
-    // Pattern de parité identique à PHP
-    const firstDigit = parseInt(fullCode[0]);
-    const parityPattern = [
-        'OOOOOO', 'OOEOEE', 'OOEEOE', 'OOEEEO', 'OEOOEE',
-        'OEEOOE', 'OEEEOO', 'OEOEOE', 'OEOEEO', 'OOEOEO'
-    ][firstDigit];
-    
-    // Garde gauche
-    bars += '<div style="display: inline-block; width: 1px; height: 40px; background: black;"></div>';
-    bars += '<div style="display: inline-block; width: 1px; height: 40px; background: white;"></div>';
-    
-    // 6 chiffres de gauche avec parité
-    for(let i = 1; i <= 6; i++) {
-        const digit = parseInt(fullCode[i]);
-        const isEven = parityPattern[i-1] === 'E';
-        const pattern = isEven ? leftEven[digit] : leftOdd[digit];
-        
-        for(let j = 0; j < pattern.length; j++) {
-            const width = pattern[j] + 'px';
-            const color = (j % 2 === 0) ? 'black' : 'white';
-            bars += `<div style="display: inline-block; width: ${width}; height: 32px; background: ${color};"></div>`;
-        }
-    }
-    
-    // Séparateur central (identique à PHP)
-    bars += '<div style="display: inline-block; width: 1px; height: 40px; background: white;"></div>';
-    bars += '<div style="display: inline-block; width: 1px; height: 40px; background: black;"></div>';
-    bars += '<div style="display: inline-block; width: 1px; height: 40px; background: white;"></div>';
-    bars += '<div style="display: inline-block; width: 1px; height: 40px; background: black;"></div>';
-    bars += '<div style="display: inline-block; width: 1px; height: 40px; background: white;"></div>';
-    
-    // 6 chiffres de droite
-    for(let i = 7; i <= 12; i++) {
-        const digit = parseInt(fullCode[i]);
-        const pattern = rightPatterns[digit];
-        
-        for(let j = 0; j < pattern.length; j++) {
-            const width = pattern[j] + 'px';
-            const color = (j % 2 === 0) ? 'black' : 'white';
-            bars += `<div style="display: inline-block; width: ${width}; height: 32px; background: ${color};"></div>`;
-        }
-    }
-    
-    // Garde droite
-    bars += '<div style="display: inline-block; width: 1px; height: 40px; background: black;"></div>';
-    bars += '<div style="display: inline-block; width: 1px; height: 40px; background: white;"></div>';
-    bars += '<div style="display: inline-block; width: 1px; height: 40px; background: black;"></div>';
-    
-    return `<div style="display: flex; align-items: end; background: white; border: 1px solid #ddd; padding: 4px; margin: 2px 0;">${bars}</div>`;
-}
-
-function calculateEAN13Checksum(code) {
-    let sum = 0;
-    for(let i = 0; i < 12; i++) {
-        const digit = parseInt(code[i]);
-        sum += digit * (i % 2 === 0 ? 1 : 3);
-    }
-    const checksum = (10 - (sum % 10)) % 10;
-    return checksum.toString();
-}
-
-function generateQRCodePreview(code) {
-    // QR Code version 1 (21x21) avec pattern correct
-    const size = 21;
-    let qrGrid = '';
-    
-    for(let y = 0; y < size; y++) {
-        for(let x = 0; x < size; x++) {
-            let isBlack = false;
-            
-            // Coins de position (7x7 avec motifs internes)
-            if ((x < 7 && y < 7) || (x > size-8 && y < 7) || (x < 7 && y > size-8)) {
-                // Carré extérieur noir
-                if ((x < 7 && y < 7 && x >= 0 && x <= 6 && y >= 0 && y <= 6) ||
-                    (x > size-8 && y < 7 && x >= size-7 && x <= size-1 && y >= 0 && y <= 6) ||
-                    (x < 7 && y > size-8 && x >= 0 && x <= 6 && y >= size-7 && y <= size-1)) {
-                    isBlack = true;
-                }
-            // Coins de position (7x7 avec motifs internes)
-            } else if ((x < 7 && y < 7) || (x > size-8 && y < 7) || (x < 7 && y > size-8)) {
-                // Carré extérieur noir
-                if ((x < 7 && y < 7 && x >= 0 && x <= 6 && y >= 0 && y <= 6) ||
-                    (x > size-8 && y < 7 && x >= size-7 && x <= size-1 && y >= 0 && y <= 6) ||
-                    (x < 7 && y > size-8 && x >= 0 && x <= 6 && y >= size-7 && y <= size-1)) {
-                    isBlack = true;
-                }
-                // Carré intérieur blanc
-                if ((x >= 2 && x <= 4 && y >= 2 && y <= 4) ||
-                    (x >= size-5 && x <= size-3 && y >= 2 && y <= 4) ||
-                    (x >= 2 && x <= 4 && y >= size-5 && y <= size-3)) {
-                    isBlack = false;
-                }
-            }
-            // Lignes de synchronisation horizontales et verticales
-            else if ((x === 6 && y >= 0 && y <= 8) || (x === 6 && y >= size-7 && y <= size-1) ||
-                     (y === 6 && x >= 8 && x <= size-1)) {
-                isBlack = true;
-            }
-            // Données (pattern déterministe basé sur le code)
-            else {
-                // Utiliser un hash simple du code pour générer un pattern déterministe
-                const hash = simpleHash(code);
-                const index = y * size + x;
-                isBlack = ((hash + index) % 17) < 8;
-            }
-            qrGrid += `<div style="display: inline-block; width: 3px; height: 3px; background: ${isBlack ? 'black' : 'white'}; border: 0.5px solid #f5f5f5;"></div>`;
-        }
-        qrGrid += '<br>';
-    }
-    return `<div style="font-size: 6px; line-height: 1; text-align: center; background: white; border: 1px solid #ddd; padding: 4px; margin: 2px 0;">${qrGrid}</div>`;
-}
-
-function simpleHash(str) {
-    let hash = 0;
-    for(let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convertir en 32 bits
-    }
-    return Math.abs(hash);
-}
-
-function renderMultiCell(element, editor) {
-    const div = document.createElement('div');
-    div.className = 'pdf-element pdf-multicell';
-    div.setAttribute('data-id', element.id);
-    div.style.left = element.x + 'mm';
-    div.style.top = element.y + 'mm';
-    div.style.width = element.width + 'mm';
-    div.style.minHeight = (element.minHeight || element.height) + 'mm';
-    
-    const mmToPx = 3.7795275591;
-    div.style.borderWidth = ((element.borderWidth || 0.1) * mmToPx) + 'px';
-    div.style.borderStyle = 'solid';
-    div.style.borderColor = element.borderColor || '#000000';
-    div.style.backgroundColor = element.fillColor === 'transparent' ? 'transparent' : (element.fillColor || 'transparent');
-    
-    // Configurer le conteneur avec flexbox pour l'alignement vertical
-    div.style.display = 'flex';
-    div.style.flexDirection = 'column';
-    const valignMap = { 'T': 'flex-start', 'M': 'center', 'B': 'flex-end' };
-    div.style.justifyContent = valignMap[element.valign] || 'flex-start';
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.textContent = (element.content || 'Texte multiligne').replace(/\\n/g, '\n');
-    contentDiv.style.whiteSpace = 'pre-wrap';
-    contentDiv.style.wordWrap = 'break-word';
-    contentDiv.style.fontSize = (element.fontSize || 12) + 'pt';
-    contentDiv.style.fontFamily = element.fontFamily || 'Arial';
-    contentDiv.style.color = element.color || '#000000';
-    
-    // Appliquer le style de police
-    const fontStyle = element.fontStyle || '';
-    contentDiv.style.fontWeight = fontStyle.includes('B') ? 'bold' : 'normal';
-    contentDiv.style.fontStyle = fontStyle.includes('I') ? 'italic' : 'normal';
-    contentDiv.style.textDecoration = fontStyle.includes('U') ? 'underline' : 'none';
-    
-    // Appliquer l'alignement horizontal
-    const alignMap = { 'L': 'left', 'C': 'center', 'R': 'right', 'J': 'justify' };
-    contentDiv.style.textAlign = alignMap[element.align] || 'left';
-    
-    // Appliquer la hauteur de ligne (lineHeight) en pixels
-    const lineHeight = element.lineHeight || (element.fontSize * 1.2);
-    contentDiv.style.lineHeight = (lineHeight * mmToPx) + 'px';
-    
-    div.appendChild(contentDiv);
-    
-    // Ajouter les contrôles z-index
-    const zControls = createZControls(element, editor);
-    div.appendChild(zControls);
-    
-    // Événements pour le déplacement et la redimensionnement
-    div.addEventListener('mousedown', (e) => startDrag(e, element, editor));
-    div.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        editor.editElement(element);
-    });
-    
-    return div;
-}
-
-function renderTextCell(element, editor) {
-    const div = document.createElement('div');
-    div.className = 'pdf-element pdf-textcell';
-    div.setAttribute('data-id', element.id);
-    div.style.left = element.x + 'mm';
-    div.style.top = element.y + 'mm';
-    div.style.width = element.width + 'mm';
-    div.style.height = element.height + 'mm';
-    
-    const mmToPx = 3.7795275591;
-    div.style.borderWidth = ((element.borderWidth || 0.1) * mmToPx) + 'px';
-    div.style.borderStyle = 'solid';
-    div.style.borderColor = element.borderColor || '#000000';
-    div.style.backgroundColor = element.fillColor === 'transparent' ? 'transparent' : (element.fillColor || 'transparent');
-    
-    // Configurer le conteneur avec flexbox pour l'alignement vertical
-    div.style.display = 'flex';
-    div.style.flexDirection = 'column';
-    const valignMap = { 'T': 'flex-start', 'M': 'center', 'B': 'flex-end' };
-    div.style.justifyContent = valignMap[element.valign] || 'flex-start';
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.textContent = element.content || 'Cellule de texte';
-    contentDiv.style.fontSize = (element.fontSize || 12) + 'pt';
-    contentDiv.style.fontFamily = element.fontFamily || 'Arial';
-    contentDiv.style.color = element.color || '#000000';
-    
-    // Appliquer le style de police
-    const fontStyle = element.fontStyle || '';
-    contentDiv.style.fontWeight = fontStyle.includes('B') ? 'bold' : 'normal';
-    contentDiv.style.fontStyle = fontStyle.includes('I') ? 'italic' : 'normal';
-    contentDiv.style.textDecoration = fontStyle.includes('U') ? 'underline' : 'none';
-    
-    // Appliquer l'alignement horizontal
-    const alignMap = { 'L': 'left', 'C': 'center', 'R': 'right', 'J': 'justify' };
-    contentDiv.style.textAlign = alignMap[element.align] || 'left';
-    
-    div.appendChild(contentDiv);
-    
-    // Ajouter les contrôles z-index
-    const zControls = createZControls(element, editor);
-    div.appendChild(zControls);
-    
-    // Événements pour le déplacement et la redimensionnement
-    div.addEventListener('mousedown', (e) => startDrag(e, element, editor));
-    div.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        editor.editElement(element);
-    });
-    
-    return div;
 }
